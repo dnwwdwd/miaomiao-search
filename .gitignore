@@ -1,0 +1,16 @@
+node_modules/
+.DS_Store
+.next/
+out/
+dist/
+build/
+coverage/
+.cache/
+.local-data/
+*.db
+*.sqlite
+*.sqlite3
+*.log
+*.tsbuildinfo
+.env*
+!.env.example

@@ -1,0 +1,53 @@
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+@import "tailwindcss";
+
+:root {
+  --canvas: oklch(0.975 0.006 250);
+  --sidebar: oklch(0.955 0.012 250);
+}
+
+* { box-sizing: border-box; }
+
+html { background: #f8fafc; }
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background-color: #f8fafc;
+  background-image: radial-gradient(at 0% 0%, rgba(37, 99, 235, 0.04) 0, transparent 40%), radial-gradient(at 100% 0%, rgba(14, 165, 233, 0.04) 0, transparent 40%);
+  color: oklch(0.23 0.025 255);
+  font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button, input, select { font: inherit; touch-action: manipulation; }
+
+input, select, textarea { font-size: 13px !important; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+.engine-tag-bing { background: #e0f2fe !important; color: #0369a1 !important; }
+.engine-tag-duckduckgo { background: #ffedd5 !important; color: #c2410c !important; }
+.engine-tag-baidu { background: #dbeafe !important; color: #1d4ed8 !important; }
+.engine-tag-exa { background: #f3e8ff !important; color: #6b21a8 !important; }
+.engine-tag-brave { background: #ffe4e6 !important; color: #be123c !important; }
+.engine-tag-csdn { background: #fef2f2 !important; color: #b91c1c !important; }
+.engine-tag-juejin { background: #eff6ff !important; color: #2563eb !important; }
+.engine-tag-sogou { background: #fef3c7 !important; color: #b45309 !important; }
+.engine-tag-startpage { background: #e0e7ff !important; color: #3730a3 !important; }
+
+button:not(:disabled), a { -webkit-tap-highlight-color: transparent; }
+
+code, pre, .font-mono { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
+
+@media (max-width: 899px) {
+  table { font-size: 12px; }
+}

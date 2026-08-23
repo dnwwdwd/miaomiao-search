@@ -1,0 +1,2064 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>lazycat-search - 自托管多引擎联网搜索 & MCP 服务</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons CDN -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .view-section { display: none; }
+        .view-section.active { display: block; }
+        
+        .white-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px 0 rgba(0, 0, 0, 0.02);
+            border-radius: 1rem;
+        }
+
+        .white-card-hover {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .white-card-hover:hover {
+            box-shadow: 0 10px 20px -5px rgba(15, 23, 42, 0.06);
+            border-color: #93c5fd;
+        }
+
+        .mesh-gradient-bg {
+            background-color: #f8fafc;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(37, 99, 235, 0.04) 0px, transparent 40%),
+                radial-gradient(at 100% 0%, rgba(14, 165, 233, 0.04) 0px, transparent 40%);
+        }
+
+        input, select, textarea { font-size: 13px !important; }
+
+        .engine-tag-bing { background: #e0f2fe; color: #0369a1; border-color: #bae6fd; }
+        .engine-tag-duckduckgo { background: #ffedd5; color: #c2410c; border-color: #fed7aa; }
+        .engine-tag-baidu { background: #dbeafe; color: #1d4ed8; border-color: #bfdbfe; }
+        .engine-tag-exa { background: #f3e8ff; color: #6b21a8; border-color: #e9d5ff; }
+        .engine-tag-brave { background: #ffe4e6; color: #be123c; border-color: #fecdd3; }
+        .engine-tag-csdn { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+        .engine-tag-juejin { background: #eff6ff; color: #2563eb; border-color: #bfdbfe; }
+        .engine-tag-sogou { background: #fef3c7; color: #b45309; border-color: #fde68a; }
+        .engine-tag-startpage { background: #e0e7ff; color: #3730a3; border-color: #c7d2fe; }
+    </style>
+</head>
+<body class="mesh-gradient-bg text-slate-800 antialiased h-screen overflow-hidden flex flex-col font-sans selection:bg-blue-600 selection:text-white">
+
+    <!-- VIEW 0: LOGIN OVERLAY -->
+    <div id="login-view" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="white-card p-8 rounded-3xl shadow-2xl w-full max-w-md border border-slate-200 text-center relative overflow-hidden bg-white">
+            <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-600 via-sky-500 to-indigo-600"></div>
+            
+            <div class="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/30">
+                <i class="ph-fill ph-planet text-3xl"></i>
+            </div>
+            
+            <h2 class="text-2xl font-extrabold text-slate-900 mb-1 tracking-tight">lazycat-search</h2>
+            <p class="text-xs text-slate-500 mb-6" data-i18n="login_subtitle">自托管多引擎联网搜索 & Remote MCP 服务 (v0.5)</p>
+
+            <!-- Login Error Alert Banner -->
+            <div id="login-error-alert" class="hidden mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs text-left flex items-start space-x-2">
+                <i class="ph-bold ph-warning-circle text-base text-red-600 flex-shrink-0 mt-0.5"></i>
+                <span id="login-error-msg">用户名或密码错误，请重新输入。</span>
+            </div>
+
+            <form onsubmit="event.preventDefault(); app.handleLogin();" class="space-y-4 text-left">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1" data-i18n="username">管理员用户名</label>
+                    <input type="text" id="login-username" value="admin" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 outline-none focus:border-blue-600 focus:bg-white font-medium">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1" data-i18n="password">密码</label>
+                    <input type="password" id="login-password" placeholder="请输入管理员密码" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 outline-none focus:border-blue-600 focus:bg-white font-medium">
+                </div>
+                <button type="submit" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl py-3 text-xs font-bold transition-all shadow-md shadow-blue-600/30 flex items-center justify-center space-x-1.5">
+                    <span data-i18n="login_btn">登录系统</span>
+                    <i class="ph-bold ph-arrow-right"></i>
+                </button>
+            </form>
+
+            <div class="mt-6 pt-4 border-t border-slate-100 text-[11px] text-slate-400 flex justify-between items-center">
+                <span data-i18n="sim_login_scenario">测试模拟场景:</span>
+                <div class="space-x-1.5">
+                    <button onclick="app.simLoginError('credential')" class="text-blue-600 hover:underline" data-i18n="sim_login_err_1">凭据错误</button>
+                    <span>•</span>
+                    <button onclick="app.simLoginError('locked')" class="text-blue-600 hover:underline" data-i18n="sim_login_err_2">账户锁定</button>
+                    <span>•</span>
+                    <button onclick="app.simLoginError('ratelimit')" class="text-blue-600 hover:underline" data-i18n="sim_login_err_3">频繁限制</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP SHELL (Hidden until login) -->
+    <div id="app-shell" class="hidden h-screen w-screen flex flex-col overflow-hidden">
+        
+        <!-- TOPBAR -->
+        <header class="bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between text-xs z-30 flex-shrink-0 shadow-2xs">
+            <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-white flex items-center justify-center font-bold shadow-md shadow-blue-500/20">
+                    <i class="ph-fill ph-planet text-xl"></i>
+                </div>
+                <div>
+                    <span class="font-extrabold text-slate-900 tracking-tight text-sm block leading-none">lazycat-search</span>
+                    <span class="text-[10px] text-blue-600 font-mono font-bold">PRD v0.5 Specification</span>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3">
+                <!-- i18n Language Selector Toggle -->
+                <div class="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                    <button onclick="app.toggleLang('zh')" id="lang-btn-zh" class="px-2.5 py-1 rounded-md font-bold text-[11px] transition-all bg-white text-blue-700 shadow-2xs">中文</button>
+                    <button onclick="app.toggleLang('en')" id="lang-btn-en" class="px-2.5 py-1 rounded-md font-bold text-[11px] transition-all text-slate-600 hover:text-slate-900">EN</button>
+                </div>
+
+                <div class="flex items-center space-x-1.5 bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1 text-[11px] text-slate-600">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span class="font-semibold text-slate-800" data-i18n="admin_session">Admin Session Active</span>
+                </div>
+                <button onclick="app.logout()" class="bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-600 border border-slate-200 hover:border-red-200 px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center space-x-1">
+                    <i class="ph-bold ph-sign-out"></i>
+                    <span data-i18n="logout">登出</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- MAIN LAYOUT BODY (Sidebar + Content Workspace) -->
+        <div class="flex-1 flex overflow-hidden relative">
+            
+            <!-- GLOBAL SIDEBAR NAVIGATION -->
+            <aside class="w-60 bg-white border-r border-slate-200 flex-shrink-0 flex flex-col h-full z-20 shadow-xs">
+                <nav class="flex-1 overflow-y-auto p-3 space-y-1">
+                    <a href="#" onclick="app.switchTab('search')" id="nav-item-search" class="nav-btn flex items-center px-3.5 py-2.5 text-xs font-bold rounded-xl text-blue-800 bg-blue-50/80 border border-blue-200/80 transition-all">
+                        <i class="ph-fill ph-magnifying-glass text-lg mr-3 text-blue-600"></i>
+                        <span data-i18n="nav_search">联网搜索</span>
+                    </a>
+                    <a href="#" onclick="app.switchTab('mcp')" id="nav-item-mcp" class="nav-btn flex items-center px-3.5 py-2.5 text-xs font-semibold rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-all">
+                        <i class="ph-fill ph-plugs-connected text-lg mr-3 text-slate-500"></i>
+                        <span data-i18n="nav_mcp">MCP 服务</span>
+                        <span class="ml-auto bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] px-1.5 py-0.5 rounded font-mono font-bold">HTTP</span>
+                    </a>
+                    <a href="#" onclick="app.switchTab('engines')" id="nav-item-engines" class="nav-btn flex items-center px-3.5 py-2.5 text-xs font-semibold rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-all">
+                        <i class="ph-fill ph-cpu text-lg mr-3 text-slate-500"></i>
+                        <span data-i18n="nav_engines">引擎管理</span>
+                        <span class="ml-auto bg-slate-100 text-slate-600 border border-slate-200 text-[10px] px-1.5 py-0.5 rounded font-mono">9/9</span>
+                    </a>
+                    <a href="#" onclick="app.switchTab('usage')" id="nav-item-usage" class="nav-btn flex items-center px-3.5 py-2.5 text-xs font-semibold rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-all">
+                        <i class="ph-fill ph-chart-line-up text-lg mr-3 text-slate-500"></i>
+                        <span data-i18n="nav_usage">统计审计</span>
+                    </a>
+                    <a href="#" onclick="app.switchTab('settings')" id="nav-item-settings" class="nav-btn flex items-center px-3.5 py-2.5 text-xs font-semibold rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-all">
+                        <i class="ph-fill ph-gear text-lg mr-3 text-slate-500"></i>
+                        <span data-i18n="nav_settings">系统配置</span>
+                    </a>
+                </nav>
+
+                <!-- Sidebar Status Footer -->
+                <div class="p-3 m-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2 text-xs">
+                    <div class="flex items-center justify-between text-slate-600">
+                        <span class="text-[11px] font-medium" data-i18n="cache_hit_rate">缓存命中率</span>
+                        <span class="font-mono font-bold text-blue-600">32.8%</span>
+                    </div>
+                    <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                        <div class="bg-blue-600 h-1.5 rounded-full" style="width: 32.8%"></div>
+                    </div>
+                    <div class="text-[10px] text-slate-400 pt-1 flex justify-between">
+                        <span>SQLite: 7.2 MB</span>
+                        <span class="text-emerald-600 font-bold">Streamable HTTP</span>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- CONTENT WORKSPACE -->
+            <main class="flex-1 overflow-y-auto p-4 md:p-8 relative bg-slate-50/50">
+                
+                <!-- VIEW 1: SEARCH PAGE -->
+                <section id="view-search" class="view-section active max-w-4xl mx-auto space-y-6 pb-16">
+                    
+                    <!-- Search Header & Logo -->
+                    <div class="text-center py-4" id="search-hero">
+                        <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight" data-i18n="search_portal_title">lazycat-search Portal</h1>
+                        <p class="text-xs text-slate-500 mt-1" data-i18n="search_portal_subtitle">聚合 Bing、Baidu、DuckDuckGo 等 9 大无 Key 搜索源</p>
+                    </div>
+
+                    <!-- Search Input Box Card -->
+                    <div class="white-card p-4 rounded-2xl border-2 border-slate-200/90 hover:border-blue-400 focus-within:border-blue-600 focus-within:ring-4 focus-within:ring-blue-500/15 transition-all shadow-md bg-white">
+                        <form id="search-form" class="flex flex-col sm:flex-row items-stretch" onsubmit="event.preventDefault(); app.doSearch();">
+                            <div class="flex-1 flex items-center px-2 py-1">
+                                <i class="ph-bold ph-magnifying-glass text-blue-600 text-xl mr-3"></i>
+                                <input type="text" id="search-input" placeholder="输入搜索关键词，或直接粘贴网页 URL..." class="w-full bg-transparent border-none outline-none text-slate-800 text-base placeholder-slate-400 font-sans font-medium" oninput="app.onSearchInput(this.value)">
+                                <button type="button" id="clear-search-btn" onclick="document.getElementById('search-input').value=''; app.onSearchInput('');" class="hidden text-slate-400 hover:text-slate-600 mr-2">
+                                    <i class="ph-bold ph-x-circle text-lg"></i>
+                                </button>
+                            </div>
+
+                            <div class="flex items-center justify-between sm:justify-end border-t sm:border-t-0 sm:border-l border-slate-200 pt-2.5 sm:pt-0 mt-2.5 sm:mt-0 pl-2 sm:pl-3 gap-2">
+                                <button type="button" onclick="app.toggleHistoryModal()" class="p-2.5 text-slate-500 hover:text-blue-600 rounded-xl hover:bg-blue-50 transition-colors" title="搜索历史">
+                                    <i class="ph-bold ph-clock-counter-clockwise text-lg"></i>
+                                </button>
+                                <button type="submit" id="search-btn" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold text-xs transition-all shadow-md shadow-blue-600/30 flex items-center space-x-1.5">
+                                    <span data-i18n="search_btn">搜索</span>
+                                    <i class="ph-bold ph-paper-plane-right"></i>
+                                </button>
+                            </div>
+                        </form>
+
+                        <!-- Direct URL Detection Banner -->
+                        <div id="url-detect-banner" class="hidden mt-3 pt-3 border-t border-slate-100 px-3 py-2 bg-blue-50 rounded-xl flex items-center justify-between text-xs text-blue-900 border border-blue-100">
+                            <span class="flex items-center font-medium"><i class="ph-bold ph-link-simple text-base mr-2 text-blue-600"></i> <span data-i18n="url_detected_hint">检测到输入为完整 URL，可直接读取网页正文</span></span>
+                            <button onclick="app.openReader(document.getElementById('search-input').value.trim())" class="bg-blue-600 text-white px-3 py-1 rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-xs flex items-center">
+                                <i class="ph-bold ph-file-text mr-1"></i> <span data-i18n="read_article_btn">读取正文</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Engine Selector & Controls Panel -->
+                    <div class="white-card p-5 rounded-2xl border border-slate-200 text-xs shadow-xs bg-white space-y-4">
+                        <div class="flex justify-between items-center pb-2 border-b border-slate-100">
+                            <span class="font-bold text-slate-800 flex items-center text-xs">
+                                <i class="ph-fill ph-sliders-horizontal mr-1.5 text-blue-600"></i> <span data-i18n="engine_selection">搜索引擎多选 (Providers)</span>
+                            </span>
+                            <button onclick="app.resetDefaultEngines()" class="text-blue-600 hover:text-blue-800 font-semibold text-xs flex items-center">
+                                <i class="ph-bold ph-arrow-counter-clockwise mr-1"></i> <span data-i18n="restore_defaults">一键恢复默认</span>
+                            </button>
+                        </div>
+                        
+                        <div>
+                            <div class="flex flex-wrap gap-2" id="engine-toggles">
+                                <!-- Injected by JS -->
+                            </div>
+                            <p class="text-[10px] text-slate-400 mt-2 flex items-center">
+                                <i class="ph-bold ph-info mr-1 text-blue-500"></i> <span data-i18n="linuxdo_notice">Linux.do 搜索上游暂不可用已默认隐藏，其单篇正文提取 fetchLinuxDoArticle 正常可用。</span>
+                            </p>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-slate-100 pt-3">
+                            <div>
+                                <label class="block text-slate-600 mb-1 font-semibold" data-i18n="search_limit_label">返回数量上限 (Limit)</label>
+                                <select id="search-limit" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-slate-800 outline-none focus:border-blue-500 font-medium">
+                                    <option value="5">5 条 (极速)</option>
+                                    <option value="10" selected>10 条 (默认推荐)</option>
+                                    <option value="20">20 条 (深度覆盖)</option>
+                                    <option value="30">30 条</option>
+                                    <option value="50">50 条 (后端最大上限)</option>
+                                </select>
+                            </div>
+
+                            <!-- Advanced Option Area: Bing Search Mode -->
+                            <div id="bing-mode-container" class="transition-all">
+                                <label class="block text-slate-600 mb-1 font-semibold flex items-center justify-between">
+                                    <span data-i18n="bing_mode_label">Bing Search Mode (高级选项)</span>
+                                    <span class="text-[10px] text-blue-600 font-mono" data-i18n="bing_only_hint">仅 Bing 选中时生效</span>
+                                </label>
+                                <select id="bing-mode" class="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-3 py-1.5 text-blue-900 outline-none focus:border-blue-500 font-medium">
+                                    <option value="auto">Auto (系统配置默认)</option>
+                                    <option value="request">Request (原生 HTTP)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Search Results Feed -->
+                    <div id="search-results-area" class="hidden space-y-4">
+                        
+                        <!-- Partial Error Alert Banner -->
+                        <div id="partial-error-alert" class="hidden bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-start space-x-3 text-xs text-amber-900 shadow-xs">
+                            <i class="ph-fill ph-warning-circle text-lg text-amber-600 flex-shrink-0 mt-0.5"></i>
+                            <div>
+                                <span class="font-bold text-amber-950" data-i18n="partial_error_title">部分搜索引擎响应失败 (单源失败不影响其他源)</span>
+                                <div id="partial-error-text" class="text-amber-800 font-mono mt-0.5 text-[11px]">
+                                    Brave 搜索失败：429 Too Many Requests
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Results Meta Summary Bar -->
+                        <div id="results-meta-bar" class="flex items-center justify-between text-xs text-slate-500 px-1">
+                            <span id="results-count-summary" class="font-medium">找到约 <strong class="text-blue-600 font-bold font-mono">2</strong> 条聚合结果 (耗时 380ms)</span>
+                            <span class="text-slate-400" data-i18n="dedup_hint">已对多引擎 URL 去重合并</span>
+                        </div>
+
+                        <!-- Error Simulator Picker Bar -->
+                        <div class="p-3 bg-slate-100/80 border border-slate-200 rounded-xl flex items-center justify-between text-xs text-slate-600">
+                            <span class="font-semibold" data-i18n="sim_status_label">模拟状态选择:</span>
+                            <div class="flex flex-wrap justify-end gap-1 font-mono text-[11px]">
+                                <button onclick="app.simSearchResult('success')" class="px-2 py-0.5 rounded bg-white border hover:border-blue-400">正常多源结果</button>
+                                <button onclick="app.simSearchResult('empty')" class="px-2 py-0.5 rounded bg-white border hover:border-blue-400">成功但无结果</button>
+                                <button onclick="app.simSearchResult('all_failed')" class="px-2 py-0.5 rounded bg-white border hover:border-blue-400">所有源均失败</button>
+                                <button onclick="app.simSearchResult('timeout')" class="px-2 py-0.5 rounded bg-white border hover:border-blue-400">网络超时</button>
+                                <button onclick="app.simSearchResult('rate_limited')" class="px-2 py-0.5 rounded bg-white border hover:border-blue-400">引擎限流</button>
+                                <button onclick="app.simSearchResult('proxy')" class="px-2 py-0.5 rounded bg-white border hover:border-blue-400">代理异常</button>
+                                <button onclick="app.simSearchResult('runtime')" class="px-2 py-0.5 rounded bg-white border hover:border-blue-400">运行时启动失败</button>
+                            </div>
+                        </div>
+
+                        <!-- Results Container List -->
+                        <div id="results-list" class="space-y-4">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- VIEW 2: MCP PAGE -->
+                <section id="view-mcp" class="view-section max-w-5xl mx-auto space-y-6 pb-16">
+                    <div>
+                        <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight" data-i18n="mcp_title">MCP 服务管理 (Model Context Protocol)</h1>
+                        <p class="text-xs text-slate-500 mt-1" data-i18n="mcp_subtitle">对外暴露符合 Anthropic MCP 规范的远程 Tools，主推 Streamable HTTP 传输协议</p>
+                    </div>
+
+                    <!-- Transport & Endpoint Status Card -->
+                    <div class="white-card p-6 rounded-2xl border border-blue-100 bg-gradient-to-br from-white via-blue-50/20 to-sky-50/20 shadow-xs space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-bold text-slate-900 flex items-center">
+                                <i class="ph-fill ph-broadcast text-blue-600 text-xl mr-2"></i> MCP Service Status
+                            </span>
+                            <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] px-2.5 py-1 rounded-full font-mono font-bold flex items-center">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span> Active
+                            </span>
+                        </div>
+
+                        <div class="bg-slate-900 text-slate-100 p-3.5 rounded-xl font-mono text-xs border border-slate-800 flex justify-between items-center shadow-inner">
+                            <div>
+                                <div class="text-slate-400 text-[10px] mb-0.5">STREAMABLE HTTP ENDPOINT</div>
+                                <code class="text-emerald-400 font-bold" id="mcp-endpoint-url">https://lazycat-search.box-id.heiyu.space/mcp</code>
+                            </div>
+                            <button onclick="app.copyText('mcp-endpoint-url')" class="text-slate-400 hover:text-white"><i class="ph-bold ph-copy text-lg"></i></button>
+                        </div>
+
+                        <div class="flex items-center justify-between text-xs text-slate-600 border-t border-slate-100 pt-3">
+                            <span class="font-semibold" data-i18n="mcp_transport_mode">Transport 协议模式</span>
+                            <div class="flex items-center space-x-3">
+                                <span class="text-blue-700 font-bold">Streamable HTTP (推荐)</span>
+                                <span class="text-slate-300">|</span>
+                                <span class="text-slate-400">Legacy SSE (默认关闭)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tool List Table -->
+                    <div class="white-card rounded-2xl border border-slate-200 overflow-hidden shadow-xs bg-white">
+                        <div class="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                            <h2 class="text-sm font-bold text-slate-900" data-i18n="mcp_tools_title">暴露的 Tools 声明 (6 Tools)</h2>
+                            <span class="text-xs text-slate-400" data-i18n="mcp_tools_desc">站点专用 fetch Tool 可由管理员单独启停</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-100/70 text-slate-500 text-[10px] uppercase font-bold border-b border-slate-200">
+                                        <th class="p-3" data-i18n="th_tool_name">Tool 名称</th>
+                                        <th class="p-3" data-i18n="th_tool_desc">描述</th>
+                                        <th class="p-3" data-i18n="th_tool_params">关键参数</th>
+                                        <th class="p-3 text-center" data-i18n="th_tool_status">状态 / 启停</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-xs divide-y divide-slate-100 font-mono text-slate-700" id="mcp-tools-tbody">
+                                    <!-- Dynamic Tools Injected -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Access Tokens Manager Table -->
+                    <div class="white-card rounded-2xl border border-slate-200 overflow-hidden shadow-xs bg-white">
+                        <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                            <div>
+                                <h2 class="text-base font-bold text-slate-900" data-i18n="tokens_title">Access Tokens (MCP 鉴权密钥)</h2>
+                                <p class="text-xs text-slate-500 mt-0.5">外部 Agent 通过 Header <code class="text-blue-600 font-mono font-semibold">Authorization: Bearer ows_...</code> 鉴权</p>
+                            </div>
+                            <button onclick="app.openCreateTokenModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-600/20 flex items-center">
+                                <i class="ph-bold ph-plus mr-1.5"></i> <span data-i18n="create_token_btn">新建 Access Token</span>
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-100/70 text-slate-500 text-[10px] uppercase font-bold border-b border-slate-200">
+                                        <th class="p-4" data-i18n="th_tk_name">名称</th>
+                                        <th class="p-4">Prefix</th>
+                                        <th class="p-4">Scope</th>
+                                        <th class="p-4" data-i18n="th_tk_created">创建时间</th>
+                                        <th class="p-4" data-i18n="th_tk_limit">限流 (Min/Day)</th>
+                                        <th class="p-4" data-i18n="th_tk_expires">过期时间</th>
+                                        <th class="p-4" data-i18n="th_tk_last_used">最近使用</th>
+                                        <th class="p-4" data-i18n="th_tk_usage">今日调用</th>
+                                        <th class="p-4" data-i18n="th_tk_status">状态</th>
+                                        <th class="p-4 text-right" data-i18n="th_tk_actions">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="token-table-body" class="text-xs divide-y divide-slate-100 font-mono">
+                                    <!-- Dynamic Token Rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Client Configurations & Connection Test -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div class="white-card rounded-2xl border border-slate-200 p-5 shadow-xs bg-white space-y-3">
+                            <h2 class="text-sm font-bold text-slate-900" data-i18n="client_config_templates">客户端接入配置模板 (5 Templates)</h2>
+                            <div class="flex space-x-1.5 border-b border-slate-200 pb-2 overflow-x-auto text-xs" id="client-config-tabs">
+                                <button onclick="app.switchClientConfigTab('workbuddy')" id="cfg-tab-workbuddy" class="px-3 py-1.5 rounded-lg font-bold bg-blue-600 text-white">WorkBuddy</button>
+                                <button onclick="app.switchClientConfigTab('cherry')" id="cfg-tab-cherry" class="px-3 py-1.5 rounded-lg font-bold text-slate-600 hover:bg-slate-100">Cherry Studio</button>
+                                <button onclick="app.switchClientConfigTab('claude')" id="cfg-tab-claude" class="px-3 py-1.5 rounded-lg font-bold text-slate-600 hover:bg-slate-100">Claude Code</button>
+                                <button onclick="app.switchClientConfigTab('codex')" id="cfg-tab-codex" class="px-3 py-1.5 rounded-lg font-bold text-slate-600 hover:bg-slate-100">Codex/Cursor</button>
+                                <button onclick="app.switchClientConfigTab('generic')" id="cfg-tab-generic" class="px-3 py-1.5 rounded-lg font-bold text-slate-600 hover:bg-slate-100">Generic</button>
+                            </div>
+                            <pre class="bg-slate-900 text-emerald-400 p-4 rounded-xl text-xs font-mono overflow-x-auto border border-slate-800 leading-relaxed" id="client-config-pre">
+                            </pre>
+                            <button onclick="app.copyClientCode()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 py-2 rounded-xl text-xs font-bold transition-colors flex items-center justify-center">
+                                <i class="ph-bold ph-copy mr-1.5"></i> <span data-i18n="copy_config_btn">复制配置代码</span>
+                            </button>
+                        </div>
+
+                        <!-- Connection Test Box -->
+                        <div class="white-card rounded-2xl border border-slate-200 p-5 shadow-xs bg-white flex flex-col justify-between space-y-4">
+                            <div>
+                                <h2 class="text-sm font-bold text-slate-900 mb-1" data-i18n="mcp_test_title">MCP Endpoint 连接测试</h2>
+                                <p class="text-xs text-slate-500" data-i18n="mcp_test_desc">向本机的 Streamable HTTP 接口发起连通自检、读取 Tools 列表并验证 search 执行。</p>
+                            </div>
+
+                            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2 text-xs font-mono text-slate-700" id="test-console-output">
+                                <div class="text-slate-400">// 点击下方按钮开始测试...</div>
+                            </div>
+
+                            <button onclick="app.runMcpConnectionTest()" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-2.5 rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-600/20 flex items-center justify-center">
+                                <i class="ph-bold ph-play mr-1.5"></i> <span data-i18n="run_mcp_test_btn">运行全套连接测试</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- VIEW 3: ENGINES PAGE -->
+                <section id="view-engines" class="view-section max-w-5xl mx-auto space-y-6 pb-16">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight" data-i18n="engines_title">搜索引擎管理 (Providers Management)</h1>
+                            <p class="text-xs text-slate-500 mt-1" data-i18n="engines_subtitle">实时监测 9 大搜索源上游健康度、响应延迟与 Search Mode 策略</p>
+                        </div>
+                        <button onclick="app.runBatchEngineCheck()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-600/20 flex items-center">
+                            <i class="ph-bold ph-arrows-clockwise mr-1.5" id="engine-spin-icon"></i> <span data-i18n="batch_health_check_btn">运行并发健康测试</span>
+                        </button>
+                    </div>
+
+                    <!-- Engines Table Card -->
+                    <div class="white-card rounded-2xl border border-slate-200 overflow-hidden shadow-xs bg-white">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-100/70 text-slate-500 text-[11px] uppercase tracking-wider border-b border-slate-200 font-bold">
+                                        <th class="p-4" data-i18n="th_eng_name">搜索引擎</th>
+                                        <th class="p-4 text-center" data-i18n="th_eng_enabled">启用 (Enabled)</th>
+                                        <th class="p-4 text-center" data-i18n="th_eng_default">默认选定</th>
+                                        <th class="p-4">Search Mode</th>
+                                        <th class="p-4" data-i18n="th_eng_last_test">最近测试</th>
+                                        <th class="p-4" data-i18n="th_eng_health">健康度状态</th>
+                                        <th class="p-4" data-i18n="th_eng_latency">延迟</th>
+                                        <th class="p-4" data-i18n="th_eng_error">最近错误</th>
+                                        <th class="p-4 text-right" data-i18n="th_eng_action">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="engine-table-body" class="text-xs divide-y divide-slate-100 font-mono">
+                                    <!-- Dynamic Engine Rows Injected -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- VIEW 4: USAGE PAGE -->
+                <section id="view-usage" class="view-section max-w-5xl mx-auto space-y-6 pb-16">
+                    <div>
+                        <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight" data-i18n="usage_title">调用统计与审计日志 (Usage Audit)</h1>
+                        <p class="text-xs text-slate-500 mt-1" data-i18n="usage_subtitle">实时监控 Web 与 MCP 调用的成功率、缓存命中率及详细请求流水</p>
+                    </div>
+
+                    <!-- Metric Cards Grid -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="white-card p-4 rounded-2xl border border-slate-200 shadow-2xs">
+                            <div class="text-slate-500 text-xs mb-1" data-i18n="metric_total_calls">24h 总调用量</div>
+                            <div class="text-2xl font-extrabold text-slate-900 font-mono">14,280</div>
+                            <div class="text-[10px] text-emerald-600 font-semibold mt-1">Web: 15% • MCP: 85%</div>
+                        </div>
+                        <div class="white-card p-4 rounded-2xl border border-slate-200 shadow-2xs">
+                            <div class="text-slate-500 text-xs mb-1" data-i18n="metric_success_rate">整体成功率</div>
+                            <div class="text-2xl font-extrabold text-emerald-600 font-mono">98.4%</div>
+                            <div class="text-[10px] text-slate-400 mt-1" data-i18n="metric_fault_tolerant">包含部分容错</div>
+                        </div>
+                        <div class="white-card p-4 rounded-2xl border border-slate-200 shadow-2xs">
+                            <div class="text-slate-500 text-xs mb-1" data-i18n="metric_cache_rate">缓存命中率</div>
+                            <div class="text-2xl font-extrabold text-blue-600 font-mono">32.8%</div>
+                            <div class="text-[10px] text-slate-400 mt-1">Search & Content</div>
+                        </div>
+                        <div class="white-card p-4 rounded-2xl border border-slate-200 shadow-2xs">
+                            <div class="text-slate-500 text-xs mb-1" data-i18n="metric_avg_latency">平均响应延迟</div>
+                            <div class="text-2xl font-extrabold text-slate-900 font-mono">420<span class="text-xs text-slate-400 font-normal">ms</span></div>
+                            <div class="text-[10px] text-slate-400 mt-1" data-i18n="metric_e2e">端到端时间</div>
+                        </div>
+                    </div>
+
+                    <!-- Per Engine Statistics Table -->
+                    <div class="white-card rounded-2xl border border-slate-200 overflow-hidden shadow-xs bg-white">
+                        <div class="p-4 border-b border-slate-100 bg-slate-50/50">
+                            <h2 class="text-sm font-bold text-slate-900" data-i18n="engine_stats_title">各搜索引擎维度统计</h2>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse text-xs font-mono">
+                                <thead>
+                                    <tr class="bg-slate-100/70 text-slate-500 text-[10px] uppercase font-bold border-b border-slate-200">
+                                        <th class="p-3" data-i18n="th_stat_engine">引擎名称</th>
+                                        <th class="p-3" data-i18n="th_stat_calls">调用次数</th>
+                                        <th class="p-3" data-i18n="th_stat_share">贡献占比</th>
+                                        <th class="p-3" data-i18n="th_stat_succ">成功率</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 text-slate-700" id="engine-stats-tbody">
+                                    <!-- Injected by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Request Audit Logs Table -->
+                    <div class="white-card rounded-2xl border border-slate-200 overflow-hidden shadow-xs bg-white">
+                        <div class="p-4 border-b border-slate-100 bg-slate-50/50 space-y-3">
+                            <div class="flex justify-between items-center">
+                                <h2 class="text-sm font-bold text-slate-900" data-i18n="audit_logs_title">请求流水审计日志 (Request Logs)</h2>
+                                <span class="text-xs text-slate-400 font-mono" id="audit-page-summary">1-5 / 7</span>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <select id="usage-channel-filter" onchange="app.updateUsageFilters()" class="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-700 outline-none focus:border-blue-500">
+                                    <option value="all" data-i18n="usage_all_channels">全部 Channel</option>
+                                    <option value="Web">Web</option>
+                                    <option value="MCP">MCP</option>
+                                </select>
+                                <select id="usage-operation-filter" onchange="app.updateUsageFilters()" class="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-700 outline-none focus:border-blue-500">
+                                    <option value="all" data-i18n="usage_all_operations">全部 Operation</option>
+                                    <option value="search">search</option>
+                                    <option value="fetchWebContent">fetchWebContent</option>
+                                    <option value="fetchCsdnArticle">fetchCsdnArticle</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-100/70 text-slate-500 text-[10px] uppercase tracking-wider border-b border-slate-200 font-bold">
+                                        <th class="p-3">Request ID</th>
+                                        <th class="p-3">Channel</th>
+                                        <th class="p-3">Operation</th>
+                                        <th class="p-3">Token</th>
+                                        <th class="p-3">Engines</th>
+                                        <th class="p-3">Latency</th>
+                                        <th class="p-3">Cache</th>
+                                        <th class="p-3">Results</th>
+                                        <th class="p-3">Status</th>
+                                        <th class="p-3">Error</th>
+                                        <th class="p-3">Created At</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-xs divide-y divide-slate-100 font-mono text-slate-700" id="audit-log-tbody">
+                                    <!-- Dynamic Audit Logs Injected -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="px-4 py-3 border-t border-slate-100 flex items-center justify-end gap-2 bg-slate-50/50">
+                            <button onclick="app.changeUsagePage(-1)" id="usage-prev-btn" class="px-3 py-1.5 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:border-blue-300 disabled:opacity-40" data-i18n="usage_prev_page">上一页</button>
+                            <button onclick="app.changeUsagePage(1)" id="usage-next-btn" class="px-3 py-1.5 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:border-blue-300 disabled:opacity-40" data-i18n="usage_next_page">下一页</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- VIEW 5: SETTINGS PAGE -->
+                <section id="view-settings" class="view-section max-w-4xl mx-auto space-y-6 pb-20">
+                    <div>
+                        <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight" data-i18n="settings_title">系统参数配置 (System Settings)</h1>
+                        <p class="text-xs text-slate-500 mt-1" data-i18n="settings_subtitle">控制 Search Runtime Proxy、缓存 TTL、限流策略与数据保留期</p>
+                    </div>
+
+                    <!-- Proxy Settings Card -->
+                    <div class="white-card rounded-2xl border border-slate-200 p-6 space-y-4 shadow-xs bg-white">
+                        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                            <div>
+                                <h2 class="text-sm font-bold text-slate-900 flex items-center">
+                                    <i class="ph-fill ph-globe text-blue-600 text-lg mr-2"></i> <span data-i18n="proxy_title">网络与代理 (Search Runtime Proxy)</span>
+                                </h2>
+                                <p class="text-xs text-slate-500 mt-0.5" data-i18n="proxy_subtitle">仅用于向搜索引擎发起外网 HTTP 请求。密码自动脱敏显示。</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input id="proxy-enabled" type="checkbox" checked class="sr-only peer">
+                                <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+                        <div class="space-y-3 text-xs">
+                            <div>
+                                <label class="block text-slate-700 mb-1 font-semibold">Proxy URL</label>
+                                <div class="flex space-x-2">
+                                    <input id="proxy-url" type="text" value="http://admin:••••••••@10.0.0.5:7890" class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-700 font-mono outline-none focus:border-blue-500">
+                                    <button onclick="app.testProxy()" class="bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 px-4 py-2 rounded-xl font-semibold transition-colors" data-i18n="test_proxy_btn">
+                                        测试代理
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cache Policy Card -->
+                    <div class="white-card rounded-2xl border border-slate-200 p-6 space-y-4 shadow-xs bg-white">
+                        <div class="pb-3 border-b border-slate-100">
+                            <h2 class="text-sm font-bold text-slate-900 flex items-center">
+                                <i class="ph-fill ph-hard-drives text-blue-600 text-lg mr-2"></i> <span data-i18n="cache_title">缓存策略 (Cache TTL Policy)</span>
+                            </h2>
+                            <p class="text-xs text-slate-500 mt-0.5" data-i18n="cache_subtitle">搜索缓存 Key 包含 query + engines + limit + searchMode。MCP 与 Web 共用缓存。</p>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                            <div class="flex items-center justify-between rounded-xl bg-slate-50 border border-slate-100 px-3.5 py-2">
+                                <span class="text-slate-700 font-semibold" data-i18n="search_cache_enabled">启用搜索缓存</span>
+                                <label class="relative inline-flex items-center cursor-pointer"><input id="search-cache-enabled" type="checkbox" checked class="sr-only peer"><div class="w-9 h-5 bg-slate-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div></label>
+                            </div>
+                            <div class="flex items-center justify-between rounded-xl bg-slate-50 border border-slate-100 px-3.5 py-2">
+                                <span class="text-slate-700 font-semibold" data-i18n="content_cache_enabled">启用正文缓存</span>
+                                <label class="relative inline-flex items-center cursor-pointer"><input id="content-cache-enabled" type="checkbox" checked class="sr-only peer"><div class="w-9 h-5 bg-slate-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div></label>
+                            </div>
+                            <div>
+                                <label class="block text-slate-700 mb-1 font-semibold" data-i18n="search_ttl_label">搜索结果 Cache TTL (秒)</label>
+                                <input type="number" value="3600" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 outline-none focus:border-blue-500 font-mono">
+                            </div>
+                            <div>
+                                <label class="block text-slate-700 mb-1 font-semibold" data-i18n="fetch_ttl_label">正文抓取 Cache TTL (秒)</label>
+                                <input type="number" value="86400" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 outline-none focus:border-blue-500 font-mono">
+                            </div>
+                            <div>
+                                <label class="block text-slate-700 mb-1 font-semibold" data-i18n="search_cache_max_size">搜索缓存最大条数</label>
+                                <input id="search-cache-max-size" type="number" min="1" value="1000" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 outline-none focus:border-blue-500 font-mono">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rate Limits Card -->
+                    <div class="white-card rounded-2xl border border-slate-200 p-6 space-y-4 shadow-xs bg-white">
+                        <div class="pb-3 border-b border-slate-100">
+                            <h2 class="text-sm font-bold text-slate-900 flex items-center"><i class="ph-fill ph-speedometer text-blue-600 text-lg mr-2"></i><span data-i18n="rate_limit_title">限流策略</span></h2>
+                            <p class="text-xs text-slate-500 mt-0.5" data-i18n="rate_limit_desc">分别限制 Web、MCP 与单个搜索引擎的请求节奏。</p>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                            <div><label class="block text-slate-700 mb-1 font-semibold" data-i18n="web_rate_limit">Web / IP（每分钟）</label><input id="web-rpm-limit" type="number" min="1" value="30" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 outline-none focus:border-blue-500 font-mono"></div>
+                            <div><label class="block text-slate-700 mb-1 font-semibold" data-i18n="mcp_rate_limit">MCP / Token（每分钟）</label><input id="mcp-rpm-limit" type="number" min="1" value="60" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 outline-none focus:border-blue-500 font-mono"></div>
+                            <div><label class="block text-slate-700 mb-1 font-semibold" data-i18n="engine_concurrency_limit">单引擎并发</label><input id="engine-concurrency-limit" type="number" min="1" value="3" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 outline-none focus:border-blue-500 font-mono"></div>
+                        </div>
+                    </div>
+
+                    <!-- Search Defaults Card -->
+                    <div class="white-card rounded-2xl border border-slate-200 p-6 space-y-4 shadow-xs bg-white">
+                        <div class="pb-3 border-b border-slate-100">
+                            <h2 class="text-sm font-bold text-slate-900 flex items-center">
+                                <i class="ph-fill ph-sliders text-blue-600 text-lg mr-2"></i> <span data-i18n="defaults_title">默认搜索参数配置</span>
+                            </h2>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                            <div class="md:col-span-2">
+                                <label class="block text-slate-700 mb-2 font-semibold" data-i18n="default_engines_label">默认搜索引擎</label>
+                                <div id="default-engine-toggles" class="flex flex-wrap gap-2"></div>
+                            </div>
+                            <div>
+                                <label class="block text-slate-700 mb-1 font-semibold" data-i18n="default_limit_label">默认返回结果数</label>
+                                <select class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 font-mono">
+                                    <option value="10" selected>10 条 (默认)</option>
+                                    <option value="20">20 条</option>
+                                    <option value="30">30 条</option>
+                                </select>
+                            </div>
+                            <div><label class="block text-slate-700 mb-1 font-semibold" data-i18n="bing_default_mode">Bing 默认 Search Mode</label><div class="w-full bg-slate-100 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-600 font-mono">Request Mode（原生 HTTP）</div></div>
+                        </div>
+                    </div>
+
+                    <!-- Data & History Management Card -->
+                    <div class="white-card rounded-2xl border border-slate-200 p-6 space-y-4 shadow-xs bg-white">
+                        <div class="pb-3 border-b border-slate-100">
+                            <h2 class="text-sm font-bold text-slate-900 flex items-center">
+                                <i class="ph-fill ph-database text-blue-600 text-lg mr-2"></i> <span data-i18n="data_mgmt_title">数据管理与审计隐私</span>
+                            </h2>
+                        </div>
+                        <div class="space-y-3 text-xs">
+                            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                                <div><span class="text-slate-800 block font-semibold" data-i18n="history_enabled_label">保存搜索历史</span><span class="text-slate-500 text-[11px]" data-i18n="history_enabled_desc">关闭后不再写入新的 Web 搜索记录。</span></div>
+                                <label class="relative inline-flex items-center cursor-pointer"><input id="history-enabled" type="checkbox" checked class="sr-only peer"><div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div></label>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <span class="text-slate-800 block font-semibold" data-i18n="history_days_label">搜索历史保存天数</span>
+                                    <span class="text-slate-500 text-[11px]" data-i18n="history_days_desc">达到天数后由 SQLite 定时任务自动清理。</span>
+                                </div>
+                                <select class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 text-slate-800 font-mono">
+                                    <option value="7">7 天</option>
+                                    <option value="30" selected>30 天</option>
+                                    <option value="90">90 天</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                                <div><span class="text-slate-800 block font-semibold" data-i18n="clear_history_settings_label">清空搜索历史</span><span class="text-slate-500 text-[11px]" data-i18n="clear_history_settings_desc">此演示操作只清除当前浏览器内的 mock 记录。</span></div>
+                                <button onclick="app.clearSearchHistory(true)" class="px-3 py-1.5 text-red-600 hover:bg-red-50 border border-red-100 rounded-lg font-semibold" data-i18n="clear_history_settings_btn">清空记录</button>
+                            </div>
+                            <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                                <div>
+                                    <span class="text-slate-800 block font-semibold" data-i18n="mcp_query_log_label">MCP 请求记录完整 Query 到数据库日志</span>
+                                    <span class="text-slate-500 text-[11px]" data-i18n="mcp_query_log_desc">关闭可提升隐私防护；开启便于全量审计。</span>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" class="sr-only peer">
+                                    <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end">
+                        <button onclick="app.saveSettings()" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold text-xs transition-all shadow-md shadow-blue-600/20" data-i18n="save_settings_btn">
+                            保存系统参数
+                        </button>
+                    </div>
+                </section>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- ARTICLE READER MODAL -->
+    <div id="reader-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="white-card rounded-3xl border border-slate-200 w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden shadow-2xl bg-white">
+            <div class="p-4 px-6 border-b border-slate-200 bg-slate-50/80 flex justify-between items-center flex-shrink-0">
+                <div class="flex-1 min-w-0 pr-4">
+                    <h3 class="text-base font-bold text-slate-900 truncate" id="reader-title">正文提取中...</h3>
+                    <div class="mt-1 space-y-1 text-xs text-slate-500">
+                        <div class="flex items-center space-x-2 min-w-0">
+                            <i class="ph-bold ph-link text-blue-600"></i>
+                            <span class="text-[10px] text-slate-400">原始 URL</span>
+                            <a href="#" target="_blank" id="reader-original-url" class="truncate hover:text-blue-600 underline font-mono">https://example.com</a>
+                        </div>
+                        <div class="flex items-center space-x-2 min-w-0">
+                            <i class="ph-bold ph-arrow-bend-down-right text-slate-400"></i>
+                            <span class="text-[10px] text-slate-400">最终 URL</span>
+                            <a href="#" target="_blank" id="reader-final-url" class="truncate hover:text-blue-600 underline font-mono">https://example.com</a>
+                            <span id="reader-badge-type" class="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold">text/html</span>
+                            <span id="reader-badge-chars" class="bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold">未截断</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-2 flex-shrink-0">
+                    <button onclick="app.copyText('reader-content-text')" class="p-2 text-slate-500 hover:text-blue-600 hover:bg-slate-200/60 rounded-xl transition-colors" title="复制正文">
+                        <i class="ph-bold ph-copy text-lg"></i>
+                    </button>
+                    <button onclick="document.getElementById('reader-modal').classList.add('hidden')" class="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors" title="关闭">
+                        <i class="ph-bold ph-x text-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Error Simulator Picker Bar inside Reader -->
+            <div class="p-2.5 px-6 bg-slate-100 border-b border-slate-200 flex items-center justify-between text-xs">
+                <span class="text-slate-600 font-semibold" data-i18n="reader_sim_label">抓取状态模拟:</span>
+                <select onchange="app.simReaderError(this.value)" class="bg-white border border-slate-300 rounded-lg px-2 py-1 text-slate-800 text-[11px] font-mono">
+                    <option value="success">正常抓取成功</option>
+                    <option value="forbidden">URL 不允许访问</option>
+                    <option value="ssrf">DNS 解析到私网 IP (SSRF 拦截)</option>
+                    <option value="redirect">重定向被阻止</option>
+                    <option value="tls">TLS 证书错误</option>
+                    <option value="extract">无法提取正文</option>
+                    <option value="timeout">抓取超时</option>
+                </select>
+            </div>
+
+            <div class="p-6 overflow-y-auto flex-1 bg-white relative font-sans leading-relaxed" id="reader-body">
+                <div id="reader-loading" class="absolute inset-0 flex flex-col items-center justify-center bg-white/95 z-10 space-y-3">
+                    <i class="ph-bold ph-spinner animate-spin text-4xl text-blue-600"></i>
+                    <p class="text-xs text-slate-500 font-medium" data-i18n="reader_fetching_hint">后端抓取器正在发起 HTTP 请求，执行 SSRF 安全校验与 Markdown 提取...</p>
+                </div>
+                
+                <div id="reader-content-text" class="whitespace-pre-wrap text-slate-800 text-sm font-sans space-y-4 leading-relaxed font-medium">
+                    <!-- Dynamic Text Injected -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ENGINE TEST SEARCH MODAL -->
+    <div id="test-engine-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="white-card p-6 rounded-3xl border border-slate-200 w-full max-w-xl space-y-4 shadow-2xl bg-white overflow-hidden flex flex-col max-h-[85vh]">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 class="text-base font-bold text-slate-900 flex items-center">
+                    <i class="ph-fill ph-flask mr-2 text-blue-600"></i> <span data-i18n="test_search_modal_title">单引擎测试搜索</span>
+                </h3>
+                <button onclick="document.getElementById('test-engine-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
+                    <i class="ph-bold ph-x text-lg"></i>
+                </button>
+            </div>
+            <p class="text-xs text-slate-500" data-i18n="test_search_modal_desc">测试结果不写入搜索历史，但会更新引擎延迟与运行指标。</p>
+            
+            <div class="space-y-3 text-xs">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-700 mb-1 font-semibold" data-i18n="target_engine">测试目标引擎</label>
+                        <input type="text" id="test-engine-target-name" readonly class="w-full bg-slate-100 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 font-mono font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-slate-700 mb-1 font-semibold" data-i18n="test_query">测试关键词 (Query)</label>
+                        <input type="text" id="test-engine-query" value="lazycat-search status check" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 font-mono">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Test Result Display Section -->
+            <div id="test-engine-result-wrapper" class="hidden flex-1 overflow-y-auto space-y-3 border-t border-slate-100 pt-3">
+                <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs font-mono">
+                    <span class="text-slate-600" data-i18n="test_res_status">状态: <strong class="text-emerald-600">200 OK</strong></span>
+                    <span class="text-slate-600" data-i18n="test_res_latency">耗时: <strong id="test-res-latency" class="text-blue-600">210ms</strong></span>
+                    <span class="text-slate-600" data-i18n="test_res_count">条目数: <strong id="test-res-count" class="text-slate-800">2 条</strong></span>
+                </div>
+                
+                <div class="space-y-2 text-xs" id="test-engine-results-preview">
+                    <!-- Dynamic Test Results Injected Here -->
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+                <button onclick="document.getElementById('test-engine-modal').classList.add('hidden')" class="px-4 py-2 text-xs text-slate-500 font-medium" data-i18n="close_btn">关闭</button>
+                <button onclick="app.submitTestEngine()" id="btn-run-engine-test" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-md shadow-blue-600/20 flex items-center">
+                    <i class="ph-bold ph-play mr-1.5" id="test-btn-icon"></i>
+                    <span data-i18n="run_test_btn">发起测试</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CREATE TOKEN MODAL -->
+    <div id="create-token-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="white-card p-6 rounded-3xl border border-slate-200 w-full max-w-md space-y-4 shadow-2xl bg-white">
+            <h3 class="text-base font-bold text-slate-900" data-i18n="create_token_modal_title">新建 Access Token</h3>
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-slate-700 mb-1 font-semibold" data-i18n="token_name_label">Token 名称</label>
+                    <input type="text" id="token-name-input" placeholder="例如: Claude Code CLI Client" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-slate-700 mb-1 font-semibold" data-i18n="token_expiration_label">过期时间 (Expiration)</label>
+                    <select id="token-expiration-select" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 outline-none">
+                        <option value="30d">30 天</option>
+                        <option value="90d">90 天</option>
+                        <option value="1y">1 年</option>
+                        <option value="never">永不过期 (Never)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-slate-700 mb-1 font-semibold" data-i18n="token_scope_label">Scope 作用域</label>
+                    <select id="token-scope-select" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 outline-none">
+                        <option value="search, fetch">search + fetch (完整权限)</option>
+                        <option value="search">仅 search</option>
+                        <option value="fetch">仅 fetch</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-700 mb-1 font-semibold" data-i18n="limit_min">每分钟请求上限</label>
+                        <input type="number" id="token-limit-min" value="60" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-slate-700 mb-1 font-semibold" data-i18n="limit_day">每日请求上限</label>
+                        <input type="number" id="token-limit-day" value="5000" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 font-mono">
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-2 pt-2">
+                <button onclick="document.getElementById('create-token-modal').classList.add('hidden')" class="px-4 py-2 text-xs text-slate-500 font-medium" data-i18n="cancel_btn">取消</button>
+                <button onclick="app.submitCreateToken()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-md shadow-blue-600/20" data-i18n="gen_token_btn">生成 Token</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SHOW SECRET ONCE MODAL -->
+    <div id="show-secret-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="white-card p-6 rounded-3xl border border-blue-200 w-full max-w-lg space-y-4 shadow-2xl bg-white">
+            <div class="flex items-center space-x-2 text-emerald-600 text-sm font-bold">
+                <i class="ph-fill ph-check-circle text-2xl"></i>
+                <span data-i18n="secret_created_title">Access Token 创建成功</span>
+            </div>
+            <p class="text-xs text-slate-600" data-i18n="secret_created_desc">完整 Secret 仅展示一次，数据库只保存其 Hash 摘要，请妥善保存：</p>
+            <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 font-mono text-xs text-emerald-400 break-all flex justify-between items-center font-bold">
+                <span id="created-raw-token">创建后展示一次的 Token</span>
+                <button onclick="app.copyText('created-raw-token')" class="ml-2 text-slate-400 hover:text-white"><i class="ph-bold ph-copy text-lg"></i></button>
+            </div>
+            <div class="flex justify-end">
+                <button onclick="document.getElementById('show-secret-modal').classList.add('hidden')" class="bg-slate-800 hover:bg-slate-900 text-white px-5 py-2 rounded-xl text-xs font-bold" data-i18n="saved_secret_btn">我已保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HISTORY MODAL -->
+    <div id="history-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="white-card rounded-3xl border border-slate-200 w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden shadow-2xl bg-white">
+            <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h3 class="text-sm font-bold text-slate-900 flex items-center"><i class="ph-bold ph-clock-counter-clockwise mr-2 text-blue-600"></i> <span data-i18n="history_modal_title">本地搜索历史</span></h3>
+                <button onclick="app.clearSearchHistory()" class="text-xs text-red-600 hover:underline font-semibold" data-i18n="clear_history_btn">清空历史</button>
+            </div>
+            <div class="p-4 overflow-y-auto space-y-2 flex-1" id="history-list-body">
+                <!-- Dynamic History Injected -->
+            </div>
+            <div class="p-3 border-t border-slate-100 text-right bg-slate-50">
+                <button onclick="document.getElementById('history-modal').classList.add('hidden')" class="bg-slate-200 text-slate-800 px-4 py-1.5 rounded-xl text-xs font-bold" data-i18n="close_btn">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl text-xs font-bold transition-all duration-300 opacity-0 pointer-events-none z-[70] flex items-center space-x-2 border border-slate-800">
+        <i class="ph-fill ph-info text-blue-400 text-lg"></i>
+        <span id="toast-msg">操作已成功完成</span>
+    </div>
+
+    <script>
+        const app = window.app = {
+            lang: 'zh',
+            state: {
+                isLoggedIn: false,
+                currentTab: 'search',
+                selectedEngines: ['bing', 'duckduckgo', 'baidu', 'sogou'],
+                activeClientConfigTab: 'workbuddy',
+                usagePage: 1,
+                usagePageSize: 5,
+                searchHistory: [
+                    { query: 'Model Context Protocol Streamable HTTP', engines: ['DuckDuckGo', 'Exa'], time: '10 mins ago', count: 3 },
+                    { query: 'lazycat-search PRD v0.5', engines: ['Baidu', 'Sogou'], time: '1 hour ago', count: 2 }
+                ]
+            },
+
+            mockData: {
+                enginesList: [
+                    { key: 'bing', name: 'Bing', enabled: true, isDefault: true, mode: 'Request', lastTest: '刚刚', health: 'Healthy', latency: '120ms', error: '-', tagClass: 'engine-tag-bing' },
+                    { key: 'baidu', name: 'Baidu', enabled: true, isDefault: true, mode: 'System', lastTest: '2 分钟前', health: 'Degraded', latency: '95ms', error: '响应波动', tagClass: 'engine-tag-baidu' },
+                    { key: 'duckduckgo', name: 'DuckDuckGo', enabled: true, isDefault: true, mode: 'System', lastTest: '3 分钟前', health: 'Healthy', latency: '210ms', error: '-', tagClass: 'engine-tag-duckduckgo' },
+                    { key: 'sogou', name: 'Sogou', enabled: true, isDefault: true, mode: 'System', lastTest: '5 分钟前', health: 'Blocked', latency: '-', error: '访问被拒绝', tagClass: 'engine-tag-sogou' },
+                    { key: 'exa', name: 'Exa', enabled: true, isDefault: false, mode: 'System', lastTest: '8 分钟前', health: 'Unavailable', latency: '-', error: '上游不可用', tagClass: 'engine-tag-exa' },
+                    { key: 'brave', name: 'Brave', enabled: true, isDefault: false, mode: 'System', lastTest: '12 分钟前', health: 'Rate Limited', latency: '450ms', error: '429 Too Many Requests', tagClass: 'engine-tag-brave' },
+                    { key: 'csdn', name: 'CSDN', enabled: false, isDefault: false, mode: 'System', lastTest: '18 分钟前', health: 'Disabled', latency: '-', error: '-', tagClass: 'engine-tag-csdn' },
+                    { key: 'juejin', name: 'Juejin', enabled: true, isDefault: false, mode: 'System', lastTest: '25 分钟前', health: 'Unknown', latency: '-', error: '尚未测试', tagClass: 'engine-tag-juejin' },
+                    { key: 'startpage', name: 'Startpage', enabled: true, isDefault: false, mode: 'System', lastTest: '31 分钟前', health: 'Healthy', latency: '280ms', error: '-', tagClass: 'engine-tag-startpage' }
+                ],
+                mcpTools: [
+                    { name: 'search', desc: '多引擎聚合搜索工具，支持返回结构化条目与去重', params: 'query (string), limit (int), engines (array), searchMode (string)', enabled: true, isCore: true },
+                    { name: 'fetchWebContent', desc: '通用网页正文抓取工具，包含 SSRF 防护与 Markdown 提取', params: 'url (string), maxChars (int)', enabled: true, isCore: false },
+                    { name: 'fetchCsdnArticle', desc: 'CSDN 专栏文章专属提取器', params: 'url (string)', enabled: true, isCore: false },
+                    { name: 'fetchJuejinArticle', desc: '掘金技术社区文章专属提取器', params: 'url (string)', enabled: true, isCore: false },
+                    { name: 'fetchGithubReadme', desc: 'GitHub Repository README.md 提取器', params: 'url (string)', enabled: true, isCore: false },
+                    { name: 'fetchLinuxDoArticle', desc: 'Linux.do 社区帖子正文提取器 (独立正常可用)', params: 'url (string)', enabled: true, isCore: false }
+                ],
+                tokens: [
+                    { name: 'Claude Code CLI', prefix: 'ows_live_8f93...', scope: 'search, fetch', createdAt: '2026-08-22 09:30', limitMin: 60, limitDay: 5000, expires: '2027-08-22', lastUsedAt: '刚刚', usageToday: 142, status: 'Active' },
+                    { name: 'Cherry Studio Desktop', prefix: 'ows_live_3c21...', scope: 'search', createdAt: '2026-08-20 15:20', limitMin: 30, limitDay: 1000, expires: '2026-12-31', lastUsedAt: '12 分钟前', usageToday: 48, status: 'Active' },
+                    { name: 'Cursor IDE Dev', prefix: 'ows_live_9a87...', scope: 'search, fetch', createdAt: '2026-08-19 11:45', limitMin: 120, limitDay: 10000, expires: '2026-09-30', lastUsedAt: '从未', usageToday: 0, status: 'Disabled' }
+                ],
+                searchResults: [
+                    {
+                        title: 'Model Context Protocol (MCP) Streamable HTTP Transport Specification',
+                        url: 'https://modelcontextprotocol.io/docs/concepts/architecture',
+                        domain: 'modelcontextprotocol.io',
+                        engines: ['DuckDuckGo', 'Exa', 'Bing'],
+                        desc: 'An in-depth overview of the Streamable HTTP transport mode in MCP. Streamable HTTP provides low-latency bidirectional communication for remote AI agents.'
+                    },
+                    {
+                        title: 'lazycat-search：自托管多引擎联网搜索 & Remote MCP 服务部署指南',
+                        url: 'https://github.com/Aas-ee/open-webSearch',
+                        domain: 'github.com',
+                        engines: ['Baidu', 'Sogou'],
+                        desc: '基于 Open-WebSearch 核心聚合 Bing、Baidu 等 9 大无 Key 搜索源，原生适配懒猫微服 LPK V2 包规范与 Streamable HTTP MCP 暴露。'
+                    }
+                ],
+                auditLogs: [
+                    { id: 'req_9a8f21b', channel: 'MCP', op: 'search', token: 'ows_live_8f93...', engines: 'Bing · DDG', latency: '320ms', cache: 'HIT', resultCount: 8, status: '200 OK', errorCode: '-', createdAt: '2026-08-23 10:42' },
+                    { id: 'req_7c3e12a', channel: 'Web', op: 'fetchWebContent', token: 'Admin Session', engines: '-', latency: '450ms', cache: 'MISS', resultCount: '-', status: '200 OK', errorCode: '-', createdAt: '2026-08-23 10:40' },
+                    { id: 'req_5b2d88c', channel: 'MCP', op: 'search', token: 'ows_live_3c21...', engines: 'Baidu', latency: '210ms', cache: 'HIT', resultCount: 5, status: '200 OK', errorCode: '-', createdAt: '2026-08-23 10:36' },
+                    { id: 'req_1e9a34f', channel: 'MCP', op: 'fetchCsdnArticle', token: 'ows_live_8f93...', engines: '-', latency: '180ms', cache: 'MISS', resultCount: '-', status: '200 OK', errorCode: '-', createdAt: '2026-08-23 10:31' },
+                    { id: 'req_0d8c76b', channel: 'Web', op: 'search', token: 'Admin Session', engines: 'Brave', latency: '380ms', cache: 'MISS', resultCount: 0, status: '429', errorCode: 'ENGINE_RATE_LIMITED', createdAt: '2026-08-23 10:28' },
+                    { id: 'req_c1d938f', channel: 'MCP', op: 'search', token: 'ows_live_8f93...', engines: 'Startpage', latency: '510ms', cache: 'MISS', resultCount: 3, status: '200 OK', errorCode: '-', createdAt: '2026-08-23 10:20' },
+                    { id: 'req_a7f4d2e', channel: 'Web', op: 'fetchWebContent', token: 'Admin Session', engines: '-', latency: '34ms', cache: 'MISS', resultCount: '-', status: '403', errorCode: 'SSRF_BLOCKED', createdAt: '2026-08-23 10:14' }
+                ]
+            },
+
+            i18n: {
+                zh: {
+                    login_subtitle: '自托管多引擎联网搜索 & Remote MCP 服务 (v0.5)',
+                    username: '管理员用户名',
+                    password: '密码',
+                    login_btn: '登录系统',
+                    sim_login_scenario: '测试模拟场景:',
+                    sim_login_err_1: '凭据错误',
+                    sim_login_err_2: '账户锁定',
+                    sim_login_err_3: '频繁限制',
+                    admin_session: '管理员会话激活',
+                    logout: '登出',
+                    nav_search: '联网搜索',
+                    nav_mcp: 'MCP 服务',
+                    nav_engines: '引擎管理',
+                    nav_usage: '统计审计',
+                    nav_settings: '系统配置',
+                    cache_hit_rate: '缓存命中率',
+                    search_portal_title: 'lazycat-search Portal',
+                    search_portal_subtitle: '聚合 Bing、Baidu、DuckDuckGo 等 9 大无 Key 搜索源',
+                    search_btn: '搜索',
+                    url_detected_hint: '检测到输入为完整 URL，可直接读取网页正文',
+                    read_article_btn: '读取正文',
+                    engine_selection: '搜索引擎多选 (Providers)',
+                    restore_defaults: '一键恢复默认',
+                    linuxdo_notice: 'Linux.do 搜索上游暂不可用已默认隐藏，其单篇正文提取 fetchLinuxDoArticle 正常可用。',
+                    search_limit_label: '返回数量上限 (Limit)',
+                    bing_mode_label: 'Bing Search Mode (高级折叠区)',
+                    bing_only_hint: '仅 Bing 选中时生效',
+                    partial_error_title: '部分搜索引擎响应失败 (单源失败不影响其他源)',
+                    dedup_hint: '已对多引擎 URL 去重合并',
+                    sim_status_label: '模拟状态选择:',
+                    mcp_title: 'MCP 服务管理 (Model Context Protocol)',
+                    mcp_subtitle: '对外暴露符合 Anthropic MCP 规范的远程 Tools，主推 Streamable HTTP 传输协议',
+                    mcp_transport_mode: 'Transport 协议模式',
+                    mcp_tools_title: '暴露的 Tools 声明 (6 Tools)',
+                    mcp_tools_desc: '站点专用 fetch Tool 可由管理员单独启停',
+                    th_tool_name: 'Tool 名称',
+                    th_tool_desc: '描述',
+                    th_tool_params: '关键参数',
+                    th_tool_status: '状态 / 启停',
+                    tokens_title: 'Access Tokens (MCP 鉴权密钥)',
+                    create_token_btn: '新建 Access Token',
+                    th_tk_name: '名称',
+                    th_tk_created: '创建时间',
+                    th_tk_limit: '限流 (Min/Day)',
+                    th_tk_expires: '过期时间',
+                    th_tk_last_used: '最近使用',
+                    th_tk_usage: '今日调用',
+                    th_tk_status: '状态',
+                    th_tk_actions: '操作',
+                    client_config_templates: '客户端接入配置模板 (5 Templates)',
+                    copy_config_btn: '复制配置代码',
+                    mcp_test_title: 'MCP Endpoint 连接测试',
+                    mcp_test_desc: '向本机的 Streamable HTTP 接口发起连通自检、读取 Tools 列表并验证 search 执行。',
+                    run_mcp_test_btn: '运行全套连接测试',
+                    engines_title: '搜索引擎管理 (Providers Management)',
+                    engines_subtitle: '实时监测 9 大搜索源上游健康度、响应延迟与 Search Mode 策略',
+                    batch_health_check_btn: '运行并发健康测试',
+                    th_eng_name: '搜索引擎',
+                    th_eng_enabled: '启用 (Enabled)',
+                    th_eng_default: '默认选定',
+                    th_eng_last_test: '最近测试',
+                    th_eng_health: '健康度状态',
+                    th_eng_latency: '延迟',
+                    th_eng_error: '最近错误',
+                    th_eng_action: '操作',
+                    usage_title: '调用统计与审计日志 (Usage Audit)',
+                    usage_subtitle: '实时监控 Web 与 MCP 调用的成功率、缓存命中率及详细请求流水',
+                    metric_total_calls: '24h 总调用量',
+                    metric_success_rate: '整体成功率',
+                    metric_fault_tolerant: '包含部分容错',
+                    metric_cache_rate: '缓存命中率',
+                    metric_avg_latency: '平均响应延迟',
+                    metric_e2e: '端到端时间',
+                    engine_stats_title: '各搜索引擎维度统计',
+                    th_stat_engine: '引擎名称',
+                    th_stat_calls: '调用次数',
+                    th_stat_share: '贡献占比',
+                    th_stat_succ: '成功率',
+                    audit_logs_title: '请求流水审计日志 (Request Logs)',
+                    usage_all_channels: '全部 Channel',
+                    usage_all_operations: '全部 Operation',
+                    usage_prev_page: '上一页',
+                    usage_next_page: '下一页',
+                    settings_title: '系统参数配置 (System Settings)',
+                    settings_subtitle: '控制 Search Runtime Proxy、缓存 TTL、限流策略与数据保留期',
+                    proxy_title: '网络与代理 (Search Runtime Proxy)',
+                    proxy_subtitle: '仅用于向搜索引擎发起外网 HTTP 请求。密码自动脱敏显示。',
+                    test_proxy_btn: '测试代理',
+                    cache_title: '缓存策略 (Cache TTL Policy)',
+                    cache_subtitle: '搜索缓存 Key 包含 query + engines + limit + searchMode。MCP 与 Web 共用缓存。',
+                    search_ttl_label: '搜索结果 Cache TTL (秒)',
+                    fetch_ttl_label: '正文抓取 Cache TTL (秒)',
+                    search_cache_enabled: '启用搜索缓存',
+                    content_cache_enabled: '启用正文缓存',
+                    search_cache_max_size: '搜索缓存最大条数',
+                    rate_limit_title: '限流策略',
+                    rate_limit_desc: '分别限制 Web、MCP 与单个搜索引擎的请求节奏。',
+                    web_rate_limit: 'Web / IP（每分钟）',
+                    mcp_rate_limit: 'MCP / Token（每分钟）',
+                    engine_concurrency_limit: '单引擎并发',
+                    defaults_title: '默认搜索参数配置',
+                    default_engines_label: '默认搜索引擎',
+                    default_limit_label: '默认返回结果数',
+                    bing_default_mode: 'Bing 默认 Search Mode',
+                    data_mgmt_title: '数据管理与审计隐私',
+                    history_days_label: '搜索历史保存天数',
+                    history_days_desc: '达到天数后由 SQLite 定时任务自动清理。',
+                    history_enabled_label: '保存搜索历史',
+                    history_enabled_desc: '关闭后不再写入新的 Web 搜索记录。',
+                    clear_history_settings_label: '清空搜索历史',
+                    clear_history_settings_desc: '此演示操作只清除当前浏览器内的 mock 记录。',
+                    clear_history_settings_btn: '清空记录',
+                    mcp_query_log_label: 'MCP 请求记录完整 Query 到数据库日志',
+                    mcp_query_log_desc: '关闭可提升隐私防护；开启便于全量审计。',
+                    save_settings_btn: '保存系统参数',
+                    reader_sim_label: '抓取状态模拟:',
+                    reader_fetching_hint: '后端抓取器正在发起 HTTP 请求，执行 SSRF 安全校验与 Markdown 提取...',
+                    test_search_modal_title: '单引擎测试搜索',
+                    test_search_modal_desc: '测试结果不写入搜索历史，但会更新引擎延迟与运行指标。',
+                    target_engine: '测试目标引擎',
+                    test_query: '测试关键词 (Query)',
+                    cancel_btn: '取消',
+                    run_test_btn: '发起测试',
+                    test_res_status: '状态:',
+                    test_res_latency: '耗时:',
+                    test_res_count: '条目数:',
+                    create_token_modal_title: '新建 Access Token',
+                    token_name_label: 'Token 名称',
+                    token_expiration_label: '过期时间 (Expiration)',
+                    token_scope_label: 'Scope 作用域',
+                    limit_min: '每分钟请求上限',
+                    limit_day: '每日请求上限',
+                    gen_token_btn: '生成 Token',
+                    secret_created_title: 'Access Token 创建成功',
+                    secret_created_desc: '完整 Secret 仅展示一次，数据库只保存其 Hash 摘要，请妥善保存：',
+                    saved_secret_btn: '我已保存',
+                    history_modal_title: '本地搜索历史',
+                    clear_history_btn: '清空历史',
+                    close_btn: '关闭'
+                },
+                en: {
+                    login_subtitle: 'Self-hosted Multi-engine Web Search & Remote MCP Server (v0.5)',
+                    username: 'Admin Username',
+                    password: 'Password',
+                    login_btn: 'Sign In',
+                    sim_login_scenario: 'Simulate Login Error:',
+                    sim_login_err_1: 'Credentials Error',
+                    sim_login_err_2: 'Account Locked',
+                    sim_login_err_3: 'Rate Limited',
+                    admin_session: 'Admin Session Active',
+                    logout: 'Logout',
+                    nav_search: 'Search',
+                    nav_mcp: 'MCP Server',
+                    nav_engines: 'Engine Management',
+                    nav_usage: 'Usage Audit',
+                    nav_settings: 'System Settings',
+                    cache_hit_rate: 'Cache Hit Rate',
+                    search_portal_title: 'lazycat-search Portal',
+                    search_portal_subtitle: 'Aggregates Bing, Baidu, DuckDuckGo & 9 Keyless Search Sources',
+                    search_btn: 'Search',
+                    url_detected_hint: 'Full URL detected. You can read the webpage content directly.',
+                    read_article_btn: 'Read Content',
+                    engine_selection: 'Search Engines (Providers)',
+                    restore_defaults: 'Restore Defaults',
+                    linuxdo_notice: 'Linux.do upstream is currently unavailable and hidden by default. Single-article fetch remains active.',
+                    search_limit_label: 'Result Count Limit',
+                    bing_mode_label: 'Bing Search Mode (Advanced)',
+                    bing_only_hint: 'Applies when Bing is active',
+                    partial_error_title: 'Partial Engine Failure (Single engine failure does not block whole request)',
+                    dedup_hint: 'De-duplicated and merged across search engines',
+                    sim_status_label: 'Simulate Response:',
+                    mcp_title: 'MCP Service Management (Model Context Protocol)',
+                    mcp_subtitle: 'Exposes Anthropic MCP-compliant remote tools via Streamable HTTP transport',
+                    mcp_transport_mode: 'Transport Protocol Mode',
+                    mcp_tools_title: 'Exposed Tools (6 Tools)',
+                    mcp_tools_desc: 'Site-specific fetch tools can be toggled by administrator',
+                    th_tool_name: 'Tool Name',
+                    th_tool_desc: 'Description',
+                    th_tool_params: 'Key Parameters',
+                    th_tool_status: 'Status / Toggle',
+                    tokens_title: 'Access Tokens (MCP Auth Keys)',
+                    create_token_btn: 'Create Access Token',
+                    th_tk_name: 'Name',
+                    th_tk_created: 'Created At',
+                    th_tk_limit: 'Limits (Min/Day)',
+                    th_tk_expires: 'Expires At',
+                    th_tk_last_used: 'Last Used At',
+                    th_tk_usage: 'Usage Today',
+                    th_tk_status: 'Status',
+                    th_tk_actions: 'Actions',
+                    client_config_templates: 'Client Configuration Templates (5 Templates)',
+                    copy_config_btn: 'Copy Configuration Code',
+                    mcp_test_title: 'MCP Endpoint Connection Self-Test',
+                    mcp_test_desc: 'Tests HTTP Streamable handshake, verifies tool declaration list, and executes search dry-run.',
+                    run_mcp_test_btn: 'Run Full Connection Test',
+                    engines_title: 'Search Providers Management',
+                    engines_subtitle: 'Monitors upstream health, latency, and mode policies across 9 search sources',
+                    batch_health_check_btn: 'Run Concurrent Health Check',
+                    th_eng_name: 'Engine',
+                    th_eng_enabled: 'Enabled',
+                    th_eng_default: 'Default',
+                    th_eng_last_test: 'Last Tested At',
+                    th_eng_health: 'Health Status',
+                    th_eng_latency: 'Latency',
+                    th_eng_error: 'Recent Error',
+                    th_eng_action: 'Action',
+                    usage_title: 'Usage Statistics & Audit Logs',
+                    usage_subtitle: 'Monitors success rates, cache hit rates, and request logs across Web and MCP channels',
+                    metric_total_calls: '24h Total Requests',
+                    metric_success_rate: 'Overall Success Rate',
+                    metric_fault_tolerant: 'Fault tolerant enabled',
+                    metric_cache_rate: 'Cache Hit Rate',
+                    metric_avg_latency: 'Avg Response Time',
+                    metric_e2e: 'End-to-End Latency',
+                    engine_stats_title: 'Per-Engine Traffic Metrics',
+                    th_stat_engine: 'Engine Name',
+                    th_stat_calls: 'Total Calls',
+                    th_stat_share: 'Share',
+                    th_stat_succ: 'Success Rate',
+                    audit_logs_title: 'Request Flow Audit Logs',
+                    usage_all_channels: 'All Channels',
+                    usage_all_operations: 'All Operations',
+                    usage_prev_page: 'Previous',
+                    usage_next_page: 'Next',
+                    settings_title: 'System Settings',
+                    settings_subtitle: 'Configures runtime proxies, cache TTLs, rate limits, and audit privacy retention',
+                    proxy_title: 'Network & Search Runtime Proxy',
+                    proxy_subtitle: 'Used strictly for outgoing HTTP search calls. Secrets masked automatically.',
+                    test_proxy_btn: 'Test Proxy',
+                    cache_title: 'Cache Policy (Cache TTL)',
+                    cache_subtitle: 'Search cache key contains query + engines + limit + searchMode. Shared by Web & MCP.',
+                    search_ttl_label: 'Search Cache TTL (Seconds)',
+                    fetch_ttl_label: 'Content Fetch Cache TTL (Seconds)',
+                    search_cache_enabled: 'Enable Search Cache',
+                    content_cache_enabled: 'Enable Content Cache',
+                    search_cache_max_size: 'Maximum Search Cache Entries',
+                    rate_limit_title: 'Rate Limit Policy',
+                    rate_limit_desc: 'Sets request pacing for Web, MCP, and each search engine.',
+                    web_rate_limit: 'Web / IP (per minute)',
+                    mcp_rate_limit: 'MCP / Token (per minute)',
+                    engine_concurrency_limit: 'Per-engine Concurrency',
+                    defaults_title: 'Default Search Parameters',
+                    default_engines_label: 'Default Search Engines',
+                    default_limit_label: 'Default Result Limit',
+                    bing_default_mode: 'Bing Default Search Mode',
+                    data_mgmt_title: 'Data Management & Audit Privacy',
+                    history_days_label: 'Search History Retention Days',
+                    history_days_desc: 'Automatically cleaned up by SQLite scheduled tasks.',
+                    history_enabled_label: 'Save Search History',
+                    history_enabled_desc: 'New Web searches are not recorded when disabled.',
+                    clear_history_settings_label: 'Clear Search History',
+                    clear_history_settings_desc: 'This demo only clears mock records in the current browser.',
+                    clear_history_settings_btn: 'Clear Records',
+                    mcp_query_log_label: 'Log Full Query in MCP Database Audit Logs',
+                    mcp_query_log_desc: 'Disable to enhance privacy; enable for complete auditability.',
+                    save_settings_btn: 'Save System Parameters',
+                    reader_sim_label: 'Simulate Extraction Result:',
+                    reader_fetching_hint: 'Fetcher is initiating HTTP request, verifying SSRF guard, and extracting Markdown...',
+                    test_search_modal_title: 'Single-Engine Test Search',
+                    test_search_modal_desc: 'Test results bypass search history, but update latency and runtime metrics.',
+                    target_engine: 'Target Engine',
+                    test_query: 'Test Query',
+                    cancel_btn: 'Cancel',
+                    run_test_btn: 'Run Test',
+                    test_res_status: 'Status:',
+                    test_res_latency: 'Latency:',
+                    test_res_count: 'Items:',
+                    create_token_modal_title: 'Create Access Token',
+                    token_name_label: 'Token Name',
+                    token_expiration_label: 'Expiration',
+                    token_scope_label: 'Scope',
+                    limit_min: 'Limit per Minute',
+                    limit_day: 'Limit per Day',
+                    gen_token_btn: 'Generate Token',
+                    secret_created_title: 'Access Token Created Successfully',
+                    secret_created_desc: 'Secret is shown ONLY ONCE. The database stores only a hashed digest. Please save it securely:',
+                    saved_secret_btn: 'I Have Saved It',
+                    history_modal_title: 'Local Search History',
+                    clear_history_btn: 'Clear History',
+                    close_btn: 'Close'
+                }
+            },
+
+            init() {
+                this.renderEngineToggles();
+                this.renderDefaultEngineToggles();
+                this.renderMcpTools();
+                this.renderTokens();
+                this.switchClientConfigTab('workbuddy');
+                this.renderEngineTable();
+                this.renderUsagePage();
+                this.applyI18n();
+            },
+
+            handleLogin() {
+                this.state.isLoggedIn = true;
+                document.getElementById('login-view').classList.add('hidden');
+                document.getElementById('app-shell').classList.remove('hidden');
+                this.showToast(this.lang === 'zh' ? '登录成功，进入 lazycat-search 管理平台' : 'Login successful. Welcome to lazycat-search.');
+            },
+
+            simLoginError(type) {
+                const errBox = document.getElementById('login-error-alert');
+                const errMsg = document.getElementById('login-error-msg');
+                errBox.classList.remove('hidden');
+                if (type === 'credential') {
+                    errMsg.innerText = this.lang === 'zh' ? '用户名或密码错误，请重新输入。' : 'Invalid username or password.';
+                } else if (type === 'locked') {
+                    errMsg.innerText = this.lang === 'zh' ? '该账号因连续多次尝试失败已被锁定，请 15 分钟后再试。' : 'Account locked due to multiple failed attempts.';
+                } else if (type === 'ratelimit') {
+                    errMsg.innerText = this.lang === 'zh' ? '请求频率过高 (429 Too Many Requests)，已触发安全限制。' : 'Rate limit exceeded (429 Too Many Requests).';
+                }
+            },
+
+            logout() {
+                this.state.isLoggedIn = false;
+                document.getElementById('app-shell').classList.add('hidden');
+                document.getElementById('login-view').classList.remove('hidden');
+            },
+
+            toggleLang(lang) {
+                this.lang = lang;
+                const btnZh = document.getElementById('lang-btn-zh');
+                const btnEn = document.getElementById('lang-btn-en');
+                if (lang === 'zh') {
+                    btnZh.className = 'px-2.5 py-1 rounded-md font-bold text-[11px] transition-all bg-white text-blue-700 shadow-2xs';
+                    btnEn.className = 'px-2.5 py-1 rounded-md font-bold text-[11px] transition-all text-slate-600 hover:text-slate-900';
+                } else {
+                    btnEn.className = 'px-2.5 py-1 rounded-md font-bold text-[11px] transition-all bg-white text-blue-700 shadow-2xs';
+                    btnZh.className = 'px-2.5 py-1 rounded-md font-bold text-[11px] transition-all text-slate-600 hover:text-slate-900';
+                }
+                this.applyI18n();
+            },
+
+            applyI18n() {
+                const dict = this.i18n[this.lang];
+                document.querySelectorAll('[data-i18n]').forEach(el => {
+                    const key = el.getAttribute('data-i18n');
+                    if (dict[key]) {
+                        el.innerText = dict[key];
+                    }
+                });
+            },
+
+            switchTab(tab) {
+                this.state.currentTab = tab;
+                document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+                document.getElementById(`view-${tab}`).classList.add('active');
+
+                document.querySelectorAll('.nav-btn').forEach(btn => {
+                    btn.className = 'nav-btn flex items-center px-3.5 py-2.5 text-xs font-semibold rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-all';
+                });
+                const activeNav = document.getElementById(`nav-item-${tab}`);
+                if (activeNav) {
+                    activeNav.className = 'nav-btn flex items-center px-3.5 py-2.5 text-xs font-bold rounded-xl text-blue-800 bg-blue-50/80 border border-blue-200/80 transition-all';
+                }
+            },
+
+            getEngineTagClass(engineName) {
+                const nameLower = engineName.toLowerCase();
+                if (nameLower.includes('bing')) return 'engine-tag-bing';
+                if (nameLower.includes('duck')) return 'engine-tag-duckduckgo';
+                if (nameLower.includes('baidu')) return 'engine-tag-baidu';
+                if (nameLower.includes('sogou')) return 'engine-tag-sogou';
+                if (nameLower.includes('exa')) return 'engine-tag-exa';
+                if (nameLower.includes('brave')) return 'engine-tag-brave';
+                if (nameLower.includes('csdn')) return 'engine-tag-csdn';
+                if (nameLower.includes('juejin')) return 'engine-tag-juejin';
+                if (nameLower.includes('startpage')) return 'engine-tag-startpage';
+                return 'bg-slate-100 text-slate-700 border-slate-200';
+            },
+
+            renderEngineToggles() {
+                const container = document.getElementById('engine-toggles');
+                container.innerHTML = '';
+                this.mockData.enginesList.forEach(eng => {
+                    const isSelected = this.state.selectedEngines.includes(eng.key);
+                    const tagCss = this.getEngineTagClass(eng.name);
+                    
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.onclick = () => this.toggleEngineSelection(eng.key);
+                    btn.className = `px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center space-x-1.5 ${
+                        isSelected 
+                            ? `${tagCss} ring-2 ring-blue-500/20 shadow-2xs` 
+                            : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'
+                    }`;
+                    btn.innerHTML = `
+                        <span>${eng.name}</span>
+                        ${isSelected ? '<i class="ph-bold ph-check text-xs"></i>' : ''}
+                    `;
+                    container.appendChild(btn);
+                });
+
+                const bingModeContainer = document.getElementById('bing-mode-container');
+                bingModeContainer.classList.toggle('hidden', !this.state.selectedEngines.includes('bing'));
+            },
+
+            renderDefaultEngineToggles() {
+                const container = document.getElementById('default-engine-toggles');
+                if (!container) return;
+                container.innerHTML = '';
+                this.mockData.enginesList.forEach(eng => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.onclick = () => this.toggleEngineDefault(eng.key);
+                    btn.className = `px-3 py-1.5 rounded-xl border text-xs font-bold transition-all ${eng.isDefault ? `${this.getEngineTagClass(eng.name)} ring-2 ring-blue-500/20` : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'}`;
+                    btn.innerHTML = `${eng.name}${eng.isDefault ? ' <i class="ph-bold ph-check text-xs ml-1"></i>' : ''}`;
+                    container.appendChild(btn);
+                });
+            },
+
+            toggleEngineSelection(key) {
+                if (this.state.selectedEngines.includes(key)) {
+                    if (this.state.selectedEngines.length === 1) {
+                        this.showToast(this.lang === 'zh' ? '至少需要保留一个选中的搜索引擎' : 'At least one search engine must remain selected');
+                        return;
+                    }
+                    this.state.selectedEngines = this.state.selectedEngines.filter(k => k !== key);
+                } else {
+                    this.state.selectedEngines.push(key);
+                }
+                this.renderEngineToggles();
+                this.renderDefaultEngineToggles();
+            },
+
+            resetDefaultEngines() {
+                this.state.selectedEngines = ['bing', 'duckduckgo', 'baidu', 'sogou'];
+                this.renderEngineToggles();
+                this.showToast(this.lang === 'zh' ? '已恢复默认引擎组合' : 'Restored default engine selections');
+            },
+
+            onSearchInput(val) {
+                const clearBtn = document.getElementById('clear-search-btn');
+                const urlBanner = document.getElementById('url-detect-banner');
+                if (val.trim()) {
+                    clearBtn.classList.remove('hidden');
+                } else {
+                    clearBtn.classList.add('hidden');
+                }
+
+                if (val.trim().startsWith('http://') || val.trim().startsWith('https://')) {
+                    urlBanner.classList.remove('hidden');
+                } else {
+                    urlBanner.classList.add('hidden');
+                }
+            },
+
+            doSearch() {
+                const input = document.getElementById('search-input').value.trim();
+                if (!input) return;
+
+                document.getElementById('search-results-area').classList.remove('hidden');
+                this.simSearchResult('success');
+                
+                if (document.getElementById('history-enabled').checked) {
+                    this.state.searchHistory.unshift({
+                        query: input,
+                        engines: this.state.selectedEngines.map(k => k.toUpperCase()),
+                        time: 'Just now',
+                        count: 2
+                    });
+                }
+            },
+
+            simSearchResult(type) {
+                const list = document.getElementById('results-list');
+                const partialAlert = document.getElementById('partial-error-alert');
+                list.innerHTML = '';
+                partialAlert.classList.add('hidden');
+
+                if (type === 'success') {
+                    if (this.state.selectedEngines.includes('brave')) partialAlert.classList.remove('hidden');
+                    this.mockData.searchResults.forEach(res => {
+                        const card = document.createElement('div');
+                        card.className = 'white-card white-card-hover p-5 rounded-2xl border border-slate-200 bg-white';
+                        
+                        const tagsHtml = res.engines.map(e => {
+                            const tagCss = this.getEngineTagClass(e);
+                            return `<span class="${tagCss} px-2 py-0.5 rounded-lg border font-bold text-[10px] shadow-2xs">${e}</span>`;
+                        }).join(' ');
+
+                        card.innerHTML = `
+                            <div class="flex items-center text-xs text-slate-500 mb-2 space-x-2">
+                                <span class="font-mono text-slate-700 font-bold">${res.domain}</span>
+                                <span class="text-slate-300">•</span>
+                                <div class="flex gap-1.5 items-center">
+                                    ${tagsHtml}
+                                </div>
+                            </div>
+                            <h3 class="text-base font-bold text-blue-700 mb-1.5"><a href="${res.url}" target="_blank" class="hover:underline">${res.title}</a></h3>
+                            <p class="text-xs text-slate-600 leading-relaxed mb-3">${res.desc}</p>
+                            <button onclick="app.openReader('${res.url}')" class="text-xs bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-800 border border-blue-200 px-3 py-1 rounded-xl font-bold flex items-center transition-all">
+                                <i class="ph-bold ph-file-text mr-1"></i> ${this.lang === 'zh' ? '读取网页正文' : 'Fetch Article Content'}
+                            </button>
+                        `;
+                        list.appendChild(card);
+                    });
+                } else if (type === 'empty') {
+                    list.innerHTML = `<div class="p-8 text-center white-card rounded-2xl text-xs text-slate-500">${this.lang === 'zh' ? '搜索成功，但未找到匹配的结果。' : 'Search completed, but no results were found.'}</div>`;
+                } else if (type === 'all_failed') {
+                    list.innerHTML = `<div class="p-8 text-center white-card rounded-2xl text-xs text-red-600 font-bold">${this.lang === 'zh' ? '所有选中搜索引擎均响应失败，请检查网络代理。' : 'All selected search engines failed to respond. Please check proxy settings.'}</div>`;
+                } else if (type === 'timeout') {
+                    list.innerHTML = `<div class="p-8 text-center white-card rounded-2xl text-xs text-amber-600 font-bold">${this.lang === 'zh' ? '搜索超时 (>5.0s)，请增加超时限制参数。' : 'Search timed out (>5.0s). Please increase timeout limits.'}</div>`;
+                } else if (type === 'rate_limited') {
+                    list.innerHTML = `<div class="p-8 text-center white-card rounded-2xl text-xs text-amber-700 font-bold">${this.lang === 'zh' ? '搜索引擎已触发频率限制（429），请稍后重试或切换其他引擎。' : 'The search engine is rate limited (429). Retry later or choose another engine.'}</div>`;
+                } else if (type === 'proxy') {
+                    list.innerHTML = `<div class="p-8 text-center white-card rounded-2xl text-xs text-red-600 font-bold">${this.lang === 'zh' ? '代理连接异常，无法建立到搜索引擎的外网请求。' : 'The proxy connection failed before reaching the search engine.'}</div>`;
+                } else if (type === 'runtime') {
+                    list.innerHTML = `<div class="p-8 text-center white-card rounded-2xl text-xs text-red-600 font-bold">${this.lang === 'zh' ? '搜索运行时启动失败，请检查服务日志和运行环境。' : 'The search runtime failed to start. Check service logs and runtime configuration.'}</div>`;
+                }
+            },
+
+            openReader(url) {
+                const modal = document.getElementById('reader-modal');
+                const title = document.getElementById('reader-title');
+                const originalLink = document.getElementById('reader-original-url');
+                const finalLink = document.getElementById('reader-final-url');
+                const loading = document.getElementById('reader-loading');
+                const bodyText = document.getElementById('reader-content-text');
+
+                title.innerText = url.includes('modelcontextprotocol') ? 'Model Context Protocol Concept & Architecture' : 'lazycat-search：自托管多引擎联网搜索 & Remote MCP 服务部署指南';
+                const finalUrl = url.includes('github.com') ? `${url}/README.md` : url;
+                originalLink.innerText = url;
+                originalLink.href = url;
+                finalLink.innerText = finalUrl;
+                finalLink.href = finalUrl;
+                loading.classList.remove('hidden');
+                bodyText.innerText = '';
+
+                modal.classList.remove('hidden');
+
+                setTimeout(() => {
+                    loading.classList.add('hidden');
+                    bodyText.innerText = `# ${title.innerText}\n\n` +
+                        `URL: ${url}\n` +
+                        `Extracted At: ${new Date().toISOString()}\n\n` +
+                        `## Summary\n\n` +
+                        `This document is processed by lazycat-search Readability engine. All scripts, inline HTML attributes, and unsafe dynamic payloads have been sanitized according to SSRF & XSS policies.\n\n` +
+                        `The Model Context Protocol (MCP) defines an open standard for AI models to interact with local or remote resources through explicit tools. Streamable HTTP provides efficient streaming without legacy SSE overhead.`;
+                }, 450);
+            },
+
+            simReaderError(val) {
+                const loading = document.getElementById('reader-loading');
+                const bodyText = document.getElementById('reader-content-text');
+                loading.classList.add('hidden');
+
+                if (val === 'success') {
+                    bodyText.innerText = '正文提取成功。包含完整 Markdown 格式化排版内容...';
+                } else if (val === 'forbidden') {
+                    bodyText.innerText = '403 Forbidden: 该 URL 拒绝了抓取器的 HTTP 请求。';
+                } else if (val === 'ssrf') {
+                    bodyText.innerText = 'SSRF Guard Blocked: 域名目标 IP 解析为 RFC1918 私网地址 (192.168.1.1)，触发安全防御禁止连接。';
+                } else if (val === 'redirect') {
+                    bodyText.innerText = 'Redirect Blocked: 跳转次数超过限制或包含非法 Scheme Header。';
+                } else if (val === 'tls') {
+                    bodyText.innerText = 'TLS Verification Error: 目标服务器证书无效或自签名证书校验未通过。';
+                } else if (val === 'extract') {
+                    bodyText.innerText = 'Content Extraction Failed: 页面可访问，但未能提取出可阅读的正文内容。';
+                } else if (val === 'timeout') {
+                    bodyText.innerText = 'Fetch Timeout: HTTP 连接超时 (>10.0s)。';
+                }
+            },
+
+            renderMcpTools() {
+                const tbody = document.getElementById('mcp-tools-tbody');
+                tbody.innerHTML = '';
+                this.mockData.mcpTools.forEach(tool => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-50/50';
+                    tr.innerHTML = `
+                        <td class="p-3 font-bold text-blue-700">${tool.name}</td>
+                        <td class="p-3 text-slate-600 font-sans text-xs">${tool.desc}</td>
+                        <td class="p-3 text-slate-500 text-[11px]">${tool.params}</td>
+                        <td class="p-3 text-center">
+                            ${tool.isCore ? 
+                                `<span class="bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-[10px] font-bold">核心必须</span>` :
+                                `<label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" ${tool.enabled ? 'checked' : ''} onchange="app.toggleMcpTool('${tool.name}')" class="sr-only peer">
+                                    <div class="w-7 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>`
+                            }
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            },
+
+            toggleMcpTool(name) {
+                const tool = this.mockData.mcpTools.find(t => t.name === name);
+                if (tool) {
+                    tool.enabled = !tool.enabled;
+                    this.showToast(this.lang === 'zh' ? `Tool [${name}] 状态已更变` : `Tool [${name}] status toggled`);
+                }
+            },
+
+            renderTokens() {
+                const tbody = document.getElementById('token-table-body');
+                tbody.innerHTML = '';
+                this.mockData.tokens.forEach(tk => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-50/50';
+                    tr.innerHTML = `
+                        <td class="p-4 font-bold text-slate-900 font-sans">${tk.name}</td>
+                        <td class="p-4 text-blue-600 font-bold">${tk.prefix}</td>
+                        <td class="p-4 text-slate-600"><span class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded text-[10px] font-bold">${tk.scope}</span></td>
+                        <td class="p-4 text-slate-500 whitespace-nowrap">${tk.createdAt}</td>
+                        <td class="p-4 text-slate-600">${tk.limitMin} / ${tk.limitDay}</td>
+                        <td class="p-4 text-slate-500">${tk.expires}</td>
+                        <td class="p-4 text-slate-500 whitespace-nowrap">${tk.lastUsedAt}</td>
+                        <td class="p-4 text-slate-800 font-bold">${tk.usageToday}</td>
+                        <td class="p-4">
+                            <span class="${tk.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'} border px-2 py-0.5 rounded text-[10px] font-bold">
+                                ${tk.status}
+                            </span>
+                        </td>
+                        <td class="p-4 text-right space-x-2">
+                            <button onclick="app.toggleTokenStatus('${tk.prefix}')" class="text-blue-600 hover:underline font-bold">${tk.status === 'Active' ? '禁用' : '启用'}</button>
+                            ${tk.status !== 'Revoked' ? `<button onclick="app.revokeToken('${tk.prefix}')" class="text-amber-600 hover:underline font-bold">撤销</button>` : ''}
+                            <button onclick="app.deleteToken('${tk.prefix}')" class="text-red-600 hover:underline font-bold">删除</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            },
+
+            toggleTokenStatus(prefix) {
+                const tk = this.mockData.tokens.find(t => t.prefix === prefix);
+                if (tk) {
+                    if (tk.status === 'Revoked') return;
+                    tk.status = tk.status === 'Active' ? 'Disabled' : 'Active';
+                    this.renderTokens();
+                    this.showToast(this.lang === 'zh' ? `Token 状态已更新` : `Token status updated`);
+                }
+            },
+
+            revokeToken(prefix) {
+                const tk = this.mockData.tokens.find(t => t.prefix === prefix);
+                if (!tk) return;
+                tk.status = 'Revoked';
+                tk.lastUsedAt = '已撤销';
+                this.renderTokens();
+                this.showToast(this.lang === 'zh' ? 'Token 已撤销，后续请求将被拒绝' : 'Token revoked; future requests will be rejected');
+            },
+
+            deleteToken(prefix) {
+                this.mockData.tokens = this.mockData.tokens.filter(t => t.prefix !== prefix);
+                this.renderTokens();
+                this.showToast(this.lang === 'zh' ? 'Token 已从 mock 列表删除' : 'Token removed from the mock list');
+            },
+
+            openCreateTokenModal() {
+                document.getElementById('create-token-modal').classList.remove('hidden');
+            },
+
+            submitCreateToken() {
+                const name = document.getElementById('token-name-input').value.trim() || 'Custom Client';
+                const scope = document.getElementById('token-scope-select').value;
+                const min = document.getElementById('token-limit-min').value;
+                const day = document.getElementById('token-limit-day').value;
+                const expiration = document.getElementById('token-expiration-select').value;
+
+                const rawSecret = `ows_live_${Math.random().toString(36).substring(2)}${Math.random().toString(36).substring(2)}`;
+                
+                this.mockData.tokens.push({
+                    name: name,
+                    prefix: `${rawSecret.substring(0, 12)}...`,
+                    scope: scope,
+                    createdAt: new Date().toLocaleString('zh-CN', { hour12: false }).slice(0, -3),
+                    limitMin: parseInt(min),
+                    limitDay: parseInt(day),
+                    expires: this.getExpirationDate(expiration),
+                    lastUsedAt: '从未',
+                    usageToday: 0,
+                    status: 'Active'
+                });
+
+                document.getElementById('create-token-modal').classList.add('hidden');
+                document.getElementById('created-raw-token').innerText = rawSecret;
+                document.getElementById('show-secret-modal').classList.remove('hidden');
+                
+                this.renderTokens();
+            },
+
+            getExpirationDate(value) {
+                if (value === 'never') return this.lang === 'zh' ? '永不过期' : 'Never';
+                const days = { '30d': 30, '90d': 90, '1y': 365 }[value];
+                const date = new Date();
+                date.setDate(date.getDate() + days);
+                return date.toISOString().slice(0, 10);
+            },
+
+            switchClientConfigTab(tab) {
+                this.state.activeClientConfigTab = tab;
+                ['workbuddy', 'cherry', 'claude', 'codex', 'generic'].forEach(t => {
+                    const btn = document.getElementById(`cfg-tab-${t}`);
+                    if (btn) {
+                        btn.className = t === tab 
+                            ? 'px-3 py-1.5 rounded-lg font-bold bg-blue-600 text-white shadow-xs' 
+                            : 'px-3.5 py-1.5 rounded-lg font-bold text-slate-600 hover:bg-slate-100';
+                    }
+                });
+                this.renderClientConfig();
+            },
+
+            renderClientConfig() {
+                const pre = document.getElementById('client-config-pre');
+                const tab = this.state.activeClientConfigTab;
+                
+                if (tab === 'workbuddy') {
+                    pre.innerText = JSON.stringify({
+                        "mcpServers": {
+                            "lazycat-search": {
+                                "command": "npx",
+                                "args": ["-y", "@modelcontextprotocol/server-fetch"],
+                                "env": {
+                                    "SEARCH_ENDPOINT": "https://lazycat-search.box-id.heiyu.space/mcp",
+                                    "AUTHORIZATION": "Bearer <YOUR_ACCESS_TOKEN>"
+                                }
+                            }
+                        }
+                    }, null, 2);
+                } else if (tab === 'cherry') {
+                    pre.innerText = JSON.stringify({
+                        "name": "lazycat-search",
+                        "type": "streamable-http",
+                        "url": "https://lazycat-search.box-id.heiyu.space/mcp",
+                        "headers": {
+                            "Authorization": "Bearer <YOUR_ACCESS_TOKEN>"
+                        }
+                    }, null, 2);
+                } else if (tab === 'claude') {
+                    pre.innerText = `claude mcp add lazycat-search --transport http https://lazycat-search.box-id.heiyu.space/mcp --header "Authorization: Bearer <YOUR_ACCESS_TOKEN>"`;
+                } else if (tab === 'codex') {
+                    pre.innerText = `[mcp.servers.lazycat-search]\nurl = "https://lazycat-search.box-id.heiyu.space/mcp"\ntransport = "streamable-http"\nheaders = { Authorization = "Bearer <YOUR_ACCESS_TOKEN>" }`;
+                } else {
+                    pre.innerText = `curl -X POST https://lazycat-search.box-id.heiyu.space/mcp \\\n  -H "Authorization: Bearer <YOUR_ACCESS_TOKEN>" \\\n  -H "Content-Type: application/json" \\\n  -d '{"jsonrpc": "2.0", "method": "tools/list", "id": 1}'`;
+                }
+            },
+
+            copyClientCode() {
+                const text = document.getElementById('client-config-pre').innerText;
+                this.copyTextToClipboard(text);
+            },
+
+            runMcpConnectionTest() {
+                const out = document.getElementById('test-console-output');
+                out.innerHTML = `<div class="text-blue-600 font-bold animate-pulse">[1/3] Initiating HTTP Handshake to /mcp...</div>`;
+
+                setTimeout(() => {
+                    out.innerHTML += `<div class="text-emerald-600">[2/3] Endpoint returned HTTP 200 OK (Protocol: Streamable HTTP).</div>`;
+                    out.innerHTML += `<div class="text-blue-600 font-bold animate-pulse">[3/3] Requesting tools/list schema...</div>`;
+                    
+                    setTimeout(() => {
+                        out.innerHTML += `<div class="text-emerald-600">[3/3] Success! Received 6 registered Tools declaration. Executing search dry-run...</div>`;
+                        out.innerHTML += `<div class="text-slate-900 font-bold mt-1 bg-emerald-100 p-2 rounded-lg border border-emerald-300">✔ All self-test checks passed successfully!</div>`;
+                    }, 500);
+                }, 400);
+            },
+
+            renderEngineTable() {
+                const tbody = document.getElementById('engine-table-body');
+                tbody.innerHTML = '';
+                this.mockData.enginesList.forEach(eng => {
+                    const tagCss = this.getEngineTagClass(eng.name);
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-50/50';
+                    tr.innerHTML = `
+                        <td class="p-4 font-bold text-slate-900 font-sans flex items-center space-x-2">
+                            <span class="${tagCss} px-2 py-0.5 rounded border font-bold text-[11px]">${eng.name}</span>
+                        </td>
+                        <td class="p-4 text-center">
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" ${eng.enabled ? 'checked' : ''} onchange="app.toggleEngineEnable('${eng.key}')" class="sr-only peer">
+                                <div class="w-7 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </td>
+                        <td class="p-4 text-center">
+                            <input type="checkbox" ${eng.isDefault ? 'checked' : ''} onchange="app.toggleEngineDefault('${eng.key}')" class="rounded text-blue-600 border-slate-300 focus:ring-blue-500">
+                        </td>
+                        <td class="p-4 text-slate-600 font-bold">${eng.mode}</td>
+                        <td class="p-4 text-slate-500 whitespace-nowrap">${eng.lastTest}</td>
+                        <td class="p-4">
+                            <span class="${this.getHealthClass(eng.health)} border px-2 py-0.5 rounded text-[10px] font-bold">
+                                ${eng.health}
+                            </span>
+                        </td>
+                        <td class="p-4 text-blue-600 font-bold">${eng.latency}</td>
+                        <td class="p-4 text-slate-400 font-sans text-xs">${eng.error}</td>
+                        <td class="p-4 text-right">
+                            <button onclick="app.openTestEngineModal('${eng.name}')" class="text-blue-600 hover:underline font-bold text-xs">${this.lang === 'zh' ? '测试搜索' : 'Test Search'}</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            },
+
+            getHealthClass(health) {
+                if (health === 'Healthy') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                if (health === 'Degraded' || health === 'Rate Limited') return 'bg-amber-50 text-amber-700 border-amber-200';
+                if (health === 'Disabled' || health === 'Unknown') return 'bg-slate-100 text-slate-500 border-slate-200';
+                return 'bg-red-50 text-red-700 border-red-200';
+            },
+
+            toggleEngineEnable(key) {
+                const eng = this.mockData.enginesList.find(e => e.key === key);
+                if (eng) {
+                    eng.enabled = !eng.enabled;
+                    this.showToast(this.lang === 'zh' ? `[${eng.name}] 引擎状态已更新` : `[${eng.name}] status updated`);
+                }
+            },
+
+            toggleEngineDefault(key) {
+                const eng = this.mockData.enginesList.find(e => e.key === key);
+                if (eng) {
+                    eng.isDefault = !eng.isDefault;
+                    this.renderDefaultEngineToggles();
+                    this.showToast(this.lang === 'zh' ? `[${eng.name}] 默认推荐状态更变` : `[${eng.name}] default state toggled`);
+                }
+            },
+
+            runBatchEngineCheck() {
+                const icon = document.getElementById('engine-spin-icon');
+                icon.classList.add('animate-spin');
+                setTimeout(() => {
+                    icon.classList.remove('animate-spin');
+                    this.mockData.enginesList.forEach(e => {
+                        e.latency = `${Math.floor(Math.random() * 200) + 80}ms`;
+                        e.lastTest = '刚刚';
+                        if (e.enabled) {
+                            e.health = 'Healthy';
+                            e.error = '-';
+                        }
+                    });
+                    this.renderEngineTable();
+                    this.showToast(this.lang === 'zh' ? '9 大搜索引擎并发健康度自检完成' : 'All 9 search engines health checked');
+                }, 600);
+            },
+
+            renderUsagePage() {
+                const statsBody = document.getElementById('engine-stats-tbody');
+                statsBody.innerHTML = '';
+                const stats = [
+                    { name: 'Bing', calls: '5,820', share: '40.7%', succ: '99.8%' },
+                    { name: 'DuckDuckGo', calls: '3,100', share: '21.7%', succ: '98.5%' },
+                    { name: 'Baidu', calls: '2,890', share: '20.2%', succ: '97.2%' },
+                    { name: 'Sogou', calls: '1,240', share: '8.6%', succ: '96.0%' },
+                    { name: 'Brave', calls: '1,230', share: '8.8%', succ: '84.1%' }
+                ];
+                stats.forEach(s => {
+                    const tagCss = this.getEngineTagClass(s.name);
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="p-3"><span class="${tagCss} px-2 py-0.5 rounded border font-bold text-[10px]">${s.name}</span></td>
+                        <td class="p-3 text-slate-800 font-bold">${s.calls}</td>
+                        <td class="p-3 text-blue-600 font-bold">${s.share}</td>
+                        <td class="p-3 text-emerald-600 font-bold">${s.succ}</td>
+                    `;
+                    statsBody.appendChild(tr);
+                });
+
+                const auditBody = document.getElementById('audit-log-tbody');
+                auditBody.innerHTML = '';
+                const channel = document.getElementById('usage-channel-filter')?.value || 'all';
+                const operation = document.getElementById('usage-operation-filter')?.value || 'all';
+                const filteredLogs = this.mockData.auditLogs.filter(log =>
+                    (channel === 'all' || log.channel === channel) &&
+                    (operation === 'all' || log.op === operation)
+                );
+                const totalPages = Math.max(1, Math.ceil(filteredLogs.length / this.state.usagePageSize));
+                this.state.usagePage = Math.min(this.state.usagePage, totalPages);
+                const start = (this.state.usagePage - 1) * this.state.usagePageSize;
+                const pageLogs = filteredLogs.slice(start, start + this.state.usagePageSize);
+                pageLogs.forEach(log => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-50/50';
+                    tr.innerHTML = `
+                        <td class="p-3 text-slate-500">${log.id}</td>
+                        <td class="p-3 font-bold ${log.channel === 'MCP' ? 'text-blue-600' : 'text-slate-800'}">${log.channel}</td>
+                        <td class="p-3 text-slate-800 font-bold">${log.op}</td>
+                        <td class="p-3 text-slate-400 text-[11px]">${log.token}</td>
+                        <td class="p-3 text-slate-500">${log.engines}</td>
+                        <td class="p-3 text-slate-600">${log.latency}</td>
+                        <td class="p-3"><span class="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[10px] font-bold">${log.cache}</span></td>
+                        <td class="p-3 text-slate-700 font-bold">${log.resultCount}</td>
+                        <td class="p-3 ${log.errorCode === '-' ? 'text-emerald-600' : 'text-red-600'} font-bold">${log.status}</td>
+                        <td class="p-3 ${log.errorCode === '-' ? 'text-slate-400' : 'text-red-600'} text-[10px]">${log.errorCode}</td>
+                        <td class="p-3 text-slate-500 whitespace-nowrap">${log.createdAt}</td>
+                    `;
+                    auditBody.appendChild(tr);
+                });
+                if (pageLogs.length === 0) {
+                    auditBody.innerHTML = `<tr><td colspan="12" class="p-6 text-center text-slate-400">没有符合条件的请求日志</td></tr>`;
+                }
+                document.getElementById('audit-page-summary').innerText = filteredLogs.length ? `${start + 1}-${Math.min(start + this.state.usagePageSize, filteredLogs.length)} / ${filteredLogs.length}` : '0 / 0';
+                document.getElementById('usage-prev-btn').disabled = this.state.usagePage <= 1;
+                document.getElementById('usage-next-btn').disabled = this.state.usagePage >= totalPages;
+            },
+
+            updateUsageFilters() {
+                this.state.usagePage = 1;
+                this.renderUsagePage();
+            },
+
+            changeUsagePage(delta) {
+                this.state.usagePage += delta;
+                this.renderUsagePage();
+            },
+
+            openTestEngineModal(name) {
+                document.getElementById('test-engine-target-name').value = name;
+                document.getElementById('test-engine-result-wrapper').classList.add('hidden');
+                document.getElementById('test-engine-modal').classList.remove('hidden');
+            },
+
+            submitTestEngine() {
+                const engineName = document.getElementById('test-engine-target-name').value;
+                const query = document.getElementById('test-engine-query').value.trim() || 'test query';
+                const btnIcon = document.getElementById('test-btn-icon');
+                
+                btnIcon.className = 'ph-bold ph-spinner animate-spin mr-1.5';
+                
+                setTimeout(() => {
+                    btnIcon.className = 'ph-bold ph-play mr-1.5';
+                    
+                    const wrapper = document.getElementById('test-engine-result-wrapper');
+                    const resultsPreview = document.getElementById('test-engine-results-preview');
+                    const tagCss = this.getEngineTagClass(engineName);
+                    
+                    document.getElementById('test-res-latency').innerText = (Math.floor(Math.random() * 200) + 120) + 'ms';
+                    const engine = this.mockData.enginesList.find(item => item.name === engineName);
+                    if (engine) {
+                        engine.lastTest = '刚刚';
+                        engine.health = 'Healthy';
+                        engine.latency = document.getElementById('test-res-latency').innerText;
+                        engine.error = '-';
+                        this.renderEngineTable();
+                    }
+                    
+                    resultsPreview.innerHTML = `
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                            <div class="flex items-center justify-between text-[11px]">
+                                <span class="${tagCss} px-2 py-0.5 rounded border font-bold text-[10px]">${engineName}</span>
+                                <span class="text-slate-400 font-mono">Rank #1</span>
+                            </div>
+                            <div class="font-bold text-blue-700 text-xs">${query} - ${engineName} Test Result Header</div>
+                            <div class="text-slate-600 text-[11px] leading-snug">
+                                Simulated search response payload received from ${engineName} search gateway. HTTP status 200 OK.
+                            </div>
+                        </div>
+                    `;
+                    
+                    wrapper.classList.remove('hidden');
+                    this.showToast(this.lang === 'zh' ? `[${engineName}] 测试搜索成功` : `[${engineName}] Test search executed`);
+                }, 400);
+            },
+
+            toggleHistoryModal() {
+                const modal = document.getElementById('history-modal');
+                this.renderHistory();
+                modal.classList.toggle('hidden');
+            },
+
+            renderHistory() {
+                const container = document.getElementById('history-list-body');
+                container.innerHTML = '';
+                if (this.state.searchHistory.length === 0) {
+                    container.innerHTML = `<div class="p-4 text-center text-xs text-slate-400">${this.lang === 'zh' ? '暂无搜索历史记录' : 'No search history'}</div>`;
+                    return;
+                }
+                this.state.searchHistory.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs';
+                    div.innerHTML = `
+                        <div>
+                            <div class="font-bold text-slate-900">${item.query}</div>
+                            <div class="text-[10px] text-slate-400 font-mono mt-0.5">${item.engines.join(' · ')} • ${item.count} 条结果 • ${item.time}</div>
+                        </div>
+                        <button onclick="document.getElementById('search-input').value='${item.query}'; app.toggleHistoryModal(); app.doSearch();" class="text-blue-600 hover:underline font-bold text-[11px]">
+                            ${this.lang === 'zh' ? '再次搜索' : 'Search Again'}
+                        </button>
+                    `;
+                    container.appendChild(div);
+                });
+            },
+
+            clearSearchHistory(fromSettings = false) {
+                this.state.searchHistory = [];
+                this.renderHistory();
+                this.showToast(this.lang === 'zh' ? '搜索历史已清空' : 'Search history cleared');
+                if (fromSettings) document.getElementById('history-modal').classList.add('hidden');
+            },
+
+            testProxy() {
+                const proxyUrl = document.getElementById('proxy-url').value.trim();
+                if (!document.getElementById('proxy-enabled').checked) {
+                    this.showToast(this.lang === 'zh' ? '请先启用代理后再测试' : 'Enable the proxy before running a test');
+                    return;
+                }
+                this.showToast(proxyUrl ? (this.lang === 'zh' ? '代理连通测试完成，延迟 110ms' : 'Proxy connection test completed in 110ms') : (this.lang === 'zh' ? '请输入代理地址' : 'Enter a proxy URL'));
+            },
+
+            saveSettings() {
+                const maxSize = Number(document.getElementById('search-cache-max-size').value);
+                const webRpm = Number(document.getElementById('web-rpm-limit').value);
+                const mcpRpm = Number(document.getElementById('mcp-rpm-limit').value);
+                const concurrency = Number(document.getElementById('engine-concurrency-limit').value);
+                if (![maxSize, webRpm, mcpRpm, concurrency].every(value => Number.isFinite(value) && value > 0)) {
+                    this.showToast(this.lang === 'zh' ? '缓存条数和限流参数必须大于 0' : 'Cache size and rate limits must be greater than 0');
+                    return;
+                }
+                this.showToast(this.lang === 'zh' ? '系统参数已保存到 mock 配置' : 'System settings saved to mock configuration');
+            },
+
+            copyText(elementId) {
+                const el = document.getElementById(elementId);
+                if (el) {
+                    this.copyTextToClipboard(el.innerText);
+                }
+            },
+
+            copyTextToClipboard(text) {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                this.showToast(this.lang === 'zh' ? '已复制到剪贴板' : 'Copied to clipboard');
+            },
+
+            showToast(msg) {
+                const toast = document.getElementById('toast');
+                const toastMsg = document.getElementById('toast-msg');
+                toastMsg.innerText = msg;
+                toast.classList.remove('opacity-0', 'pointer-events-none');
+                setTimeout(() => {
+                    toast.classList.add('opacity-0', 'pointer-events-none');
+                }, 2200);
+            }
+        };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            app.init();
+        });
+    </script>
+</body>
+</html>
