@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import type { AppDatabase } from "../db/client.js";
 import { settings } from "../db/schema.js";
 
-const sensitiveKeys = new Set(["proxy.url"]);
+const sensitiveKeys = new Set(["proxy.url", "engine.exa.apiKey"]);
 
 export class SettingsService {
   constructor(private readonly database: AppDatabase, private readonly encryptionKey: Buffer) {}
@@ -18,6 +18,10 @@ export class SettingsService {
     } else {
       this.database.orm.insert(settings).values({ key, value: storedValue, encrypted: shouldEncrypt, updatedAt: now }).run();
     }
+  }
+
+  delete(key: string): void {
+    this.database.orm.delete(settings).where(eq(settings.key, key)).run();
   }
 
   get<T>(key: string): T | undefined {

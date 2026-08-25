@@ -4,7 +4,7 @@ import { openDatabase } from "./db/client.js";
 import { migrate } from "./db/migrate.js";
 import { bootstrapDatabase } from "./services/bootstrap.js";
 import { AuditService } from "./services/audit.js";
-import { AuthService } from "./services/auth.js";
+import { OidcService } from "./services/oidc.js";
 import { SearchService } from "./services/search.js";
 import { SettingsService } from "./services/settings.js";
 import { TokenService } from "./services/tokens.js";
@@ -24,7 +24,7 @@ const app = buildServer(config, upstream, {
   database,
   audit,
   settings,
-  auth: new AuthService(database, config.jwtSecret),
+  auth: new OidcService(config.oidc, config.sessionSecret),
   tokens: new TokenService(database, config.tokenHashKey),
   rateLimiter: new SlidingWindowRateLimiter(),
   search: new SearchService(upstream, audit, settings, undefined, undefined, (requested: EngineId[]) => {
@@ -35,6 +35,9 @@ const app = buildServer(config, upstream, {
     const disabled = selected.find((id) => !enabled.has(id));
     if (disabled) throw new DomainError("ENGINE_DISABLED", `搜索引擎 ${disabled} 已停用`);
     return selected;
+  }, (requested: EngineId[]) => {
+    const configured = database.orm.select().from(engines).all();
+    return Object.fromEntries(requested.map((id) => [id, configured.find((engine) => engine.id === id)?.resultLimit ?? null]));
   }),
 });
 

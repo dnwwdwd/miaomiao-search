@@ -7,7 +7,7 @@ import type { SettingsService } from "./services/settings.js";
 import type { TokenService, VerifiedToken } from "./services/tokens.js";
 
 export const mcpTools = [
-  { id: "search", name: "search", description: "多引擎聚合搜索", parameters: "query, limit, engines, searchMode", scope: "search" as const },
+  { id: "search", name: "search", description: "多引擎分组与聚合搜索", parameters: "query, limit?, engines, searchMode", scope: "search" as const },
   { id: "fetchWebContent", name: "fetchWebContent", description: "抓取通用网页正文", parameters: "url, maxChars", scope: "fetch" as const },
   { id: "fetchCsdnArticle", name: "fetchCsdnArticle", description: "读取 CSDN 文章正文", parameters: "url", scope: "fetch" as const, siteSpecific: true, host: "csdn.net" },
   { id: "fetchJuejinArticle", name: "fetchJuejinArticle", description: "读取掘金文章正文", parameters: "url", scope: "fetch" as const, siteSpecific: true, host: "juejin.cn" },
@@ -30,7 +30,7 @@ export function createMcpServer(dependencies: { search: SearchService; tokens: T
   if (enabled.search) {
     server.registerTool("search", {
       title: "Multi-engine search", description: "Search with the enabled public web engines.",
-      inputSchema: z.object({ query: z.string().min(1).max(500), engines: z.array(z.enum(engineIds)).min(1).max(engineIds.length).optional(), limit: z.number().int().min(1).max(50).default(10), searchMode: z.enum(["auto", "request"]).optional() }),
+      inputSchema: z.object({ query: z.string().min(1).max(500), engines: z.array(z.enum(engineIds)).min(1).max(engineIds.length).optional(), limit: z.number().int().min(1).max(50).optional(), searchMode: z.enum(["auto", "request"]).optional() }),
     }, async ({ query, engines, limit, searchMode }) => {
       const release = ensureScope("search");
       try {

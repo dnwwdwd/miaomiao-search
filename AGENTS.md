@@ -14,6 +14,60 @@ created_by: notus_agent
 - 文档、代码和测试不一致时，先记录差异并说明影响。涉及产品范围、数据语义、权限、安全、兼容性或成本的差异，必须等用户确认后再定案。
 - 回复使用清楚、平实的中文。不要使用含义模糊的行业套话。
 
+## 本地启动方式
+
+本项目本地运行需要同时启动三个进程，启动顺序为 Open-WebSearch daemon → Fastify API → Next.js 门户：
+
+| 服务 | 默认地址 | 启动命令 |
+|---|---|---|
+| Open-WebSearch daemon | `http://127.0.0.1:3210` | `pnpm --filter @lazycat-search/server exec open-websearch serve --port 3210` |
+| Fastify API / MCP | `http://127.0.0.1:3001` | `pnpm server:dev` |
+| Next.js 门户 | `http://127.0.0.1:3000` | `pnpm dev` |
+
+要求 Node.js 20+、pnpm，以及可用的 Open-WebSearch daemon。Windows PowerShell 可按下面的顺序在三个终端启动。环境变量只放在当前终端进程中，不要把真实密钥写入仓库：
+
+```powershell
+# 终端 1：启动 Open-WebSearch
+$env:SEARCH_MODE = "request"
+# 如果需要通过本机代理访问外网，再打开下面两项
+# $env:USE_PROXY = "true"
+# $env:PROXY_URL = "http://127.0.0.1:7890"
+# Exa 官方 Search API 需要密钥；如启用，只在当前终端设置，不要写入仓库
+# $env:EXA_API_KEY = "请替换为 Exa API Key"
+pnpm --filter @lazycat-search/server exec open-websearch serve --port 3210
+```
+
+```powershell
+# 终端 2：启动 Fastify API 和 MCP
+$env:NODE_ENV = "development"
+$env:DATA_DIR = ".\.local-data"
+$env:APP_ORIGIN = "http://127.0.0.1:3000"
+$env:APP_INSTANCE_SECRET = "请替换为至少 32 个字符的实例密钥"
+$env:OIDC_CLIENT_ID = "请替换为懒猫 OIDC Client ID"
+$env:OIDC_CLIENT_SECRET = "请替换为懒猫 OIDC Client Secret"
+$env:OIDC_ISSUER_URI = "请替换为懒猫 OIDC Issuer URI"
+$env:OIDC_AUTH_URI = "请替换为懒猫 OIDC Authorization URI"
+$env:OIDC_TOKEN_URI = "请替换为懒猫 OIDC Token URI"
+$env:OIDC_USERINFO_URI = "请替换为懒猫 OIDC UserInfo URI"
+$env:OPEN_WEBSEARCH_URL = "http://127.0.0.1:3210"
+pnpm server:dev
+```
+
+```powershell
+# 终端 3：启动 Next.js 门户
+pnpm dev
+```
+
+启动后访问 `http://127.0.0.1:3000/`。可用以下命令验证三个服务：
+
+```powershell
+Invoke-WebRequest http://127.0.0.1:3210 -UseBasicParsing
+Invoke-WebRequest http://127.0.0.1:3001/health -UseBasicParsing
+Invoke-WebRequest http://127.0.0.1:3000/ -UseBasicParsing
+```
+
+`/health` 会检查上游 daemon；如果 API 启动时报 `UPSTREAM_UNAVAILABLE`，先确认 `3210` 已启动。应用认证通过用户点击登录页按钮发起 OIDC 授权，不使用 `X-HC-*` Header 自动登录；`.local-data` 只作为当前开发实例的数据目录，启动和重启不会清空其中的数据。停止服务时分别在三个终端按 `Ctrl+C`，不要强制结束不确定归属的进程。
+
 ## 开始任务前的阅读顺序
 
 1. 根目录 `AGENTS.md` 与当前用户要求。

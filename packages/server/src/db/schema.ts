@@ -1,13 +1,5 @@
 import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-export const admins = sqliteTable("admin", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  username: text("username").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
-});
-
 export const accessTokens = sqliteTable("access_token", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -27,6 +19,7 @@ export const engines = sqliteTable("engine", {
   enabled: integer("enabled", { mode: "boolean" }).notNull(),
   isDefault: integer("is_default", { mode: "boolean" }).notNull(),
   searchMode: text("search_mode", { enum: ["auto", "request"] }),
+  resultLimit: integer("result_limit"),
   lastTestAt: text("last_test_at"),
   status: text("status").notNull(),
   latencyMs: integer("latency_ms"),
@@ -39,6 +32,7 @@ export const searchHistory = sqliteTable("search_history", {
   query: text("query").notNull(),
   engines: text("engines").notNull(),
   resultCount: integer("result_count").notNull(),
+  resultSnapshot: text("result_snapshot"),
   createdAt: text("created_at").notNull(),
 }, (table) => [index("search_history_created_at_idx").on(table.createdAt)]);
 

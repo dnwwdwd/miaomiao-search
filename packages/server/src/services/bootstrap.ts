@@ -1,9 +1,8 @@
-import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import type { ServerConfig } from "../config.js";
 import { engineIds } from "../domain.js";
 import type { AppDatabase } from "../db/client.js";
-import { admins, engines, settings } from "../db/schema.js";
+import { engines, settings } from "../db/schema.js";
 
 const defaultSettings: Record<string, unknown> = {
   "proxy.enabled": false,
@@ -18,6 +17,9 @@ const defaultSettings: Record<string, unknown> = {
   "engine.concurrency": 3,
   "search.defaultEngines": ["bing", "duckduckgo"],
   "search.defaultLimit": 10,
+  "search.homeEngines": [],
+  "search.homeRequestLimit": null,
+  "search.homeBingMode": "request",
   "search.maxLimit": 50,
   "fetch.maxChars": 50000,
   "history.enabled": true,
@@ -29,15 +31,6 @@ const defaultSettings: Record<string, unknown> = {
 
 export async function bootstrapDatabase(database: AppDatabase, config: ServerConfig): Promise<void> {
   const now = new Date().toISOString();
-  const existingAdmin = database.orm.select({ id: admins.id }).from(admins).limit(1).get();
-  if (!existingAdmin) {
-    if (!config.adminPassword) {
-      throw new Error("ADMIN_PASSWORD is required when initializing an empty database");
-    }
-    const passwordHash = await bcrypt.hash(config.adminPassword, 12);
-    database.orm.insert(admins).values({ username: config.adminUsername, passwordHash, createdAt: now, updatedAt: now }).run();
-  }
-
   for (const id of engineIds) {
     const existing = database.orm.select({ id: engines.id }).from(engines).where(eq(engines.id, id)).get();
     if (!existing) {

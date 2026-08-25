@@ -6,7 +6,7 @@ title: "Lazycat Search 技术实现文档"
 
 # Lazycat Search 技术实现文档
 
-> 项目名：lazycat-search　基础项目：Open-WebSearch　文档版本：v1.0　日期：2026-08-22
+> 项目名：lazycat-search　基础项目：Open-WebSearch　文档版本：v1.0　实现同步：2026-08-24
 
 ## 1. 技术栈总览
 
@@ -17,21 +17,31 @@ title: "Lazycat Search 技术实现文档"
 | 后端框架 | Fastify | ≥ 5.x | 高性能、原生 TypeScript 支持、插件体系成熟、JSON Schema 校验内建 |
 | 前端框架 | Next.js（React） | ≥ 16 | 使用 App Router 管理页面与布局，为后续服务端集成保留边界 |
 | 前端构建 | Next.js / Turbopack | — | 使用 Next.js 官方开发与生产构建流程 |
-| UI 组件库 | 项目内基础组件 + Tailwind CSS v4 | — | Button、Input、SearchInput、Tag、Tabs、Switch、Select、Modal、Toast 由项目源码维护，避免运行时组件依赖 |
-| 状态管理 | React Context + useState（当前 mock） | React 内建 | 当前阶段只维护浏览器内演示状态；接入真实数据时再按需求确认服务端状态方案 |
-| HTTP 客户端 | 原生 fetch（待接入） | 浏览器内建 | 当前 mock 不发起 API 请求；真实 API 实现时统一封装 |
-| 数据库 | SQLite | — | 单文件、零运维，适合自托管和懒猫微服 `/lzcapp/var/data` 持久化 |
+| UI 组件库 | 项目内基础组件 + Tailwind CSS v4 | — | Button、Input、SearchInput、Tag、Tabs、Switch、RadioGroup、Dropdown、Select、Modal、Toast 由项目源码维护，避免运行时组件依赖 |
+| 状态管理 | React Context + useState | React 内建 | Context 保存页面会话数据和短暂交互状态；引擎、历史、Token、设置和审计数据通过同源管理 API 刷新 |
+| HTTP 客户端 | 原生 fetch 封装 | 浏览器内建 | `src/lib/api.ts` 统一处理 Cookie、JSON 请求和服务端错误；仅开发环境使用 Next rewrite，LPK 由网关直接转发 `/api/` 与 `/mcp` |
+| 数据库 | SQLite | — | 单文件、零运维，适合自托管和懒猫微服 `/lzcapp/var/lazycat-search/data` 持久化 |
 | ORM | Drizzle ORM + drizzle-kit | ≥ 0.38 | 类型安全、SQL-first、SQLite 适配良好、迁移工具内建 |
 | MCP SDK | @modelcontextprotocol/sdk | ≥ 1.x | 官方 SDK，Streamable HTTP Transport 开箱可用 |
-| 认证 | JWT (jose) + bcrypt (bcryptjs) | — | 无状态 Token；bcrypt 哈希管理员密码 |
+| 认证 | 懒猫 OIDC Authorization Code + PKCE（jose） | — | 用户点击门户按钮发起授权；验证 state、nonce、PKCE 与 ID Token，不保留本地密码账户 |
 | 日志 | pino | ≥ 9.x | Fastify 默认日志库，JSON 结构化输出 |
 | 测试 | Node.js Test Runner、Next.js 构建、TypeScript、ESLint | — | 当前已有 3 个源代码契约测试，并具备 lint、类型与生产构建命令 |
-| 容器 | Docker multi-stage | — | 构建阶段 + 运行阶段分离，最终镜像 ≤ 200 MB |
+| 容器 | 懒猫 LPK V2 | — | `web` 与 `api` 使用懒猫 Node 基础镜像；API 内运行私有 Open-WebSearch daemon |
 | 包管理 | pnpm | ≥ 9.x | Monorepo workspace 支持、依赖安装快、磁盘占用小 |
+
+### 1.1 当前 LPK、认证与持久化口径（2026-08-25）
+
+- 发布包为 Linux amd64 的多实例 LPK：`cloud.lazycat.app.lazycat-search`（`0.1.0`）。`web` 运行 Next standalone，`api` 运行 Fastify 及只监听 `127.0.0.1:3210` 的 Open-WebSearch daemon。
+- 根路径和 `/api/` 受懒猫网关登录保护；只有 `/mcp` 配置为 `public_path`，并且仍只接受本应用独立签发的 Bearer Token。门户 Cookie、OIDC 会话与 MCP Token 互不复用。
+- 门户不从 `X-HC-*` Header 自动登录。用户必须在登录页点击按钮，走 OIDC Authorization Code + PKCE 回调；服务端校验 state、nonce、签名、issuer、audience 与过期时间。
+- 仅 API 服务挂载 `/lzcapp/var/lazycat-search/data`，其中的新实例目录由平台以空目录提供。LPK 不携带数据库文件，应用只迁移和写入默认值；不设置首次清空或任意删除挂载数据的逻辑。
+- 每实例密钥由 `.S.DeployID` 派生，分别用于 Cookie 签名、应用会话、MCP Token HMAC 与设置加密。历史本地 `admin` 表及密码认证已由版本化迁移移除。
 
 ## 2. 项目结构
 
-### 2.1 后端与部署规划目录（尚未实现）
+### 2.1 后端与部署历史规划（非当前文件布局）
+
+下列目录树保留为早期架构草图，不代表当前仓库的实际文件路径。当前可运行实现以 2.2、2.3 及第 7 节 API 表为准；当前 LPK 文件位于仓库根目录的 `package.yml`、`lzc-manifest.yml`、`lzc-build.yml` 与 `lzc/`。
 
 ```
 lazycat-search/
@@ -46,9 +56,9 @@ lazycat-search/
 │   │   │   │   ├── search.ts    # POST /api/search, POST /api/fetch-content
 │   │   │   │   ├── engines.ts   # GET/PATCH /api/engines, POST /api/engines/:id/test
 │   │   │   │   ├── tokens.ts    # CRUD /api/tokens
-│   │   │   │   ├── settings.ts  # GET/PATCH /api/settings
-│   │   │   │   ├── usage.ts     # GET /api/usage/overview, GET /api/usage/logs
-│   │   │   │   └── mcp-admin.ts # GET /api/mcp/status, PATCH /api/mcp/tools
+│   │   │   │   ├── settings.ts  # 历史规划：配置 API
+│   │   │   │   ├── usage.ts     # 历史规划：统计 API
+│   │   │   │   └── mcp-admin.ts # 历史规划：MCP 管理 API
 │   │   │   ├── mcp/
 │   │   │   │   ├── server.ts    # MCP Server 实例，注册 Tool
 │   │   │   │   ├── transport.ts # Streamable HTTP + Legacy SSE Transport 适配
@@ -56,7 +66,7 @@ lazycat-search/
 │   │   │   ├── engines/
 │   │   │   │   ├── manager.ts   # 引擎注册、状态管理、健康检查
 │   │   │   │   ├── base.ts      # SearchEngine 抽象基类
-│   │   │   │   └── adapters/    # bing.ts, baidu.ts, duckduckgo.ts, brave.ts...
+│   │   │   │   └── adapters/    # bing.ts, baidu.ts, duckduckgo.ts, exa.ts...
 │   │   │   ├── services/
 │   │   │   │   ├── search.ts    # 多引擎聚合搜索、去重、排序
 │   │   │   │   ├── fetch.ts     # 网页正文抓取、SSRF 防护
@@ -100,7 +110,6 @@ lazycat-search/
 │   │   │   │   └── utils.ts
 │   │   │   └── types/
 │   │   ├── index.html
-│   │   ├── vite.config.ts
 │   │   ├── tailwind.config.ts
 │   │   └── package.json
 │   └── shared/                  # 前后端共享
@@ -131,7 +140,7 @@ lazycat-search/
 │   ├── components/
 │   │   ├── ui/                  # 项目基础组件
 │   │   └── portal/              # Shell、状态上下文与五个管理页面 JSX
-│   ├── lib/mock-data.ts         # 每页 mock 数据与客户端模板
+│   ├── lib/mock-data.ts         # 历史原型数据与客户端配置模板；不作为服务端数据源
 │   └── types/portal.ts          # 门户状态和数据类型
 ├── docs/DESIGN.md               # 门户视觉与组件规范
 ├── package.json                 # pnpm scripts 与 Next.js 依赖
@@ -145,6 +154,8 @@ lazycat-search/
 ```
 packages/server/
 ├── drizzle/0000_initial.sql    # 六表 SQLite 初始迁移
+├── drizzle/0001_search_history_snapshot.sql # 搜索历史结果快照迁移
+├── drizzle/0002_engine_result_limit.sql     # 引擎独立结果数量迁移
 ├── src/
 │   ├── db/                     # Drizzle schema、SQLite 连接和迁移执行器
 │   ├── services/               # 认证、Token、设置、审计、缓存、搜索和 SSRF
@@ -152,25 +163,16 @@ packages/server/
 └── test/services.test.ts       # 领域服务与安全路径测试
 ```
 
-当前工程已实现 Fastify 管理 API、SQLite、管理员会话、MCP Token、缓存、搜索聚合、正文 URL 校验、Open-WebSearch 适配器、远程 `/mcp` 与门户真实数据接入；Docker 与懒猫微服配置仍是后续工作。
+当前工程已实现 Fastify 管理 API、SQLite、懒猫 OIDC 门户会话、MCP Token、缓存、搜索聚合、正文 URL 校验、Open-WebSearch 适配器、远程 `/mcp`、门户真实数据接入和 LPK V2 配置。
 
 ## 3. 数据库设计
 
-SQLite 数据库文件路径：`DATA_DIR/lazycat-search.db`，懒猫微服部署时 `DATA_DIR=/lzcapp/var/data`。
+SQLite 数据库文件路径：`DATA_DIR/lazycat-search.db`，懒猫微服部署时 `DATA_DIR=/lzcapp/var/lazycat-search/data`。新实例挂载空目录，不携带数据库文件；迁移和默认设置只补齐缺失项，不会清理已挂载的数据。
 
 ### 3.1 表结构
 
 ```sql
--- 管理员账户（V1 单用户）
-CREATE TABLE admin (
-  id         INTEGER PRIMARY KEY,
-  username   TEXT    NOT NULL UNIQUE,
-  password   TEXT    NOT NULL,          -- bcrypt hash
-  created_at TEXT    NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
-);
-
--- MCP Access Token
+-- MCP Access Token（独立于懒猫账户与门户会话）
 CREATE TABLE access_token (
   id              TEXT    PRIMARY KEY,  -- nanoid
   name            TEXT    NOT NULL,
@@ -191,6 +193,7 @@ CREATE TABLE engine (
   enabled      INTEGER NOT NULL DEFAULT 1,
   is_default   INTEGER NOT NULL DEFAULT 0,
   search_mode  TEXT,                    -- Bing 专属：'auto' | 'request'
+  result_limit INTEGER,                 -- 每引擎结果数量；NULL 使用搜索默认值 search.defaultLimit（初始 10）
   last_test_at TEXT,
   status       TEXT    NOT NULL DEFAULT 'unknown',
   latency_ms   INTEGER,
@@ -204,6 +207,7 @@ CREATE TABLE search_history (
   query      TEXT    NOT NULL,
   engines    TEXT    NOT NULL,          -- JSON array
   result_count INTEGER NOT NULL DEFAULT 0,
+  result_snapshot TEXT,                 -- JSON: results + failures + 可选 engineResults；不保存正文、Token 或认证信息
   created_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -213,6 +217,7 @@ CREATE TABLE request_log (
   channel      TEXT    NOT NULL,        -- 'web' | 'mcp'
   operation    TEXT    NOT NULL,        -- 'search' | 'fetchWebContent' | ...
   token_id     TEXT,                    -- MCP 调用关联的 Token ID
+  token_prefix TEXT,                    -- 列表展示用 Prefix
   query        TEXT,                    -- 管理员配置是否记录
   engines      TEXT,                    -- JSON array
   latency_ms   INTEGER NOT NULL,
@@ -244,17 +249,19 @@ CREATE TABLE setting (
 | `cache.content.ttl` | `86400` | 正文缓存 TTL（秒） |
 | `rateLimit.web.rpm` | `30` | Web 每 IP 每分钟请求上限 |
 | `search.defaultEngines` | `["bing","duckduckgo"]` | 默认搜索引擎 |
-| `search.defaultLimit` | `10` | 默认结果数量 |
+| `search.defaultLimit` | `10` | 搜索默认返回数；未单独配置引擎数量时使用 |
 | `search.maxLimit` | `50` | 最大结果数量 |
 | `fetch.maxChars` | `50000` | 正文最大字符数 |
 | `history.enabled` | `true` | 搜索历史开关 |
-| `history.retentionDays` | `30` | 搜索历史保留天数 |
+| `history.retentionDays` | `30` | 搜索历史保留天数；`-1` 表示永久保存 |
 | `log.saveQuery` | `false` | 日志是否记录 Query 原文 |
 | `mcp.legacySse` | `false` | Legacy SSE Transport 开关 |
 
 ## 4. 后端架构
 
 ### 4.1 Fastify 插件注册顺序
+
+以下代码是早期注册顺序示意，保留用于说明依赖关系；当前可运行入口为 `packages/server/src/app.ts`，由 `buildServer()` 注册 Cookie、CORS、限流、Host/Origin 校验、健康检查、管理 API 和 Streamable HTTP `/mcp`。
 
 ```typescript
 // app.ts
@@ -297,18 +304,20 @@ app.setNotFoundHandler((req, reply) => {
 
 ### 4.2 认证流程
 
-**管理员登录（Web）：**
+**门户 OIDC 登录（Web）：**
 
 ```
-POST /api/auth/login
-  Body: { username, password }
-  → bcrypt.compare(password, admin.password)
-  → 签发 JWT { sub: admin.id, iat, exp: 24h }
-  → Set-Cookie: token=<jwt>; HttpOnly; Secure; SameSite=Strict; Path=/
-  → Response: { ok: true }
+GET /api/auth/oidc/start（由用户点击登录按钮发起）
+  → 生成 state、nonce、PKCE verifier/challenge
+  → Set-Cookie: 短期签名 OIDC state；HttpOnly、Secure、SameSite=Lax
+  → 302 到懒猫 OIDC 授权端
+GET /api/auth/oidc/callback
+  → 校验 state、nonce、PKCE、ID Token 签名、issuer、audience 与 exp
+  → Set-Cookie: lazycat_search_session；HttpOnly、Secure、SameSite=Lax，24h
+  → 302 到固定首页
 ```
 
-JWT 通过 HttpOnly Cookie 传输，前端不直接接触 Token 值。每个 `/api/*` 请求由 `jwtPlugin` 校验 Cookie。
+应用会话通过 HttpOnly Cookie 传输，前端不直接接触其值。每个受保护 `/api/*` 请求校验该会话；不会以 `X-HC-*` Header 自动创建应用登录状态。
 
 **MCP Token 认证：**
 
@@ -368,51 +377,52 @@ export abstract class SearchEngine {
 
 ### 4.4 多引擎聚合搜索
 
+当前实现已按引擎独立发起搜索并返回 `engineResults[]` 分组结果，同时保留 `results` 平铺聚合结果以兼容现有 MCP 客户端。每个引擎的有效数量为 `min(调用方 limit, engine.result_limit 或 search.defaultLimit)`，先按引擎截取，再按规范化 URL 去重并合并来源标签。`engine.result_limit` 为空时使用搜索默认值（初始 10）；管理 API、首页分组视图、历史兼容和 MCP 已完成接入。
+
 ```typescript
 // services/search.ts
 export async function aggregateSearch(params: {
   query: string;
   engines: string[];
-  limit: number;
+  limit?: number;
   searchMode?: string;
 }): Promise<{
   results: MergedResult[];
+  engineResults: EngineResultGroup[];
+  resultCount: number;
   failures: EngineFailure[];
   cached: boolean;
 }> {
-  // 1. 检查缓存
-  const cacheKey = buildCacheKey(params);
-  const cached = cache.get(cacheKey);
-  if (cached) return { ...cached, cached: true };
-
-  // 2. 并发调用各引擎
+  // 每个引擎独立解析有效数量并使用 query + engine + limit + searchMode 缓存键
   const tasks = params.engines.map(id =>
     engineManager.get(id).search({
       query: params.query,
-      limit: params.limit,
-      searchMode: params.searchMode,
+      limit: Math.min(params.limit ?? getEngineLimit(id), getEngineLimit(id)),
+      searchMode: id === 'bing' ? 'request' : undefined,
     })
   );
   const settled = await Promise.allSettled(tasks);
 
-  // 3. 收集结果和失败
+  // 收集每引擎分组，再生成兼容的聚合结果
   const allResults: SearchResult[] = [];
+  const engineResults: EngineResultGroup[] = [];
   const failures: EngineFailure[] = [];
   settled.forEach((result, i) => {
     if (result.status === 'fulfilled') {
-      allResults.push(...result.value);
+      const group = { engine: params.engines[i], results: result.value.slice(0, getEngineLimit(params.engines[i])), cached: false };
+      engineResults.push(group);
+      allResults.push(...group.results);
     } else {
-      failures.push({ engine: params.engines[i], error: result.reason });
+      const failure = { engine: params.engines[i], error: result.reason };
+      failures.push(failure);
+      engineResults.push({ engine: params.engines[i], results: [], cached: false, failure });
     }
   });
 
   // 4. URL 去重合并 — 同一 URL 的结果合并来源引擎标签
   const merged = deduplicateByUrl(allResults);
 
-  // 5. 写入缓存
-  cache.set(cacheKey, { results: merged, failures });
-
-  return { results: merged, failures, cached: false };
+  return { results: merged, engineResults, resultCount: merged.length, failures, cached: engineResults.length > 0 && engineResults.every((group) => group.cached) };
 }
 ```
 
@@ -482,7 +492,7 @@ const contentCache = new LRUCache<string, CachedContent>({
 ```
 
 缓存 Key 生成策略：
-- 搜索：`SHA-256(query + engines.sort().join(',') + limit + searchMode)`
+- 搜索：每个引擎独立使用 `SHA-256(query + engine + effectiveLimit + searchMode)`；配置数量变化自然切换缓存键
 - 正文：`SHA-256(url)`
 
 Web 和 MCP 共用同一缓存实例。
@@ -526,6 +536,8 @@ export function getLogs(params: { page, pageSize, channel?, operation?, tokenId?
   // 分页查询 request_log
 }
 ```
+
+当前 Usage 实现由 `AuditService.usage()` 提供范围统计，接口参数为 `from`、`to`、`channel`、`operation`、`status`、`engine`、`page`、`pageSize` 和 `timeZone`。默认范围为最近 7 天，查询最多 365 天；范围使用左闭右开时间比较。响应同时返回 summary、Web/MCP channel 分布、按用户时区生成的小时/日趋势、Operation 统计、引擎统计、facets 和分页 logs。MCP `search` 与 `fetchWebContent` 通过 `SearchService` 分别写入 `channel=mcp` 的对应审计记录，统计不会读取或重复计算 `search_history` 快照。
 
 ## 5. MCP Server 实现
 
@@ -607,31 +619,31 @@ PortalApp       -> LoginScreen 或 PortalShell
 PortalShell     -> Search / MCP / Engines / Usage / Settings 页面 JSX
 ```
 
-当前 mock 阶段把五个管理页面保持在一个受控门户容器中，以复现静态原型的无刷新导航。接入真实会话和 URL 路由时，应迁移到 App Router 的受保护路由段，并由服务端鉴权决定访问权限。
+当前门户把五个管理页面保持在一个受控容器中，以复现静态原型的无刷新导航；登录、服务状态、页面数据和操作均已通过 Fastify 管理 API 接入。开发环境的 Next rewrite 提供同源 `/api/*` 与 `/mcp`；LPK 生产环境由网关直接转发，应用会话 Cookie 由服务端校验。
 
 ### 6.2 状态管理
 
 ```typescript
-// portal-context.tsx — 当前浏览器内的 mock 状态
-// SearchPage — 搜索输入、引擎选择、结果列表、正文面板
-// SettingsPage — 可编辑配置的 mock 状态
+// portal-context.tsx — API 数据与浏览器内短暂交互状态
+// SearchPage — 搜索输入、引擎选择、结果列表、正文面板和历史快照
+// SettingsPage — 读取并更新服务端持久化设置
 ```
 
 关键原则：
-- 当前状态不持久化、不发起网络请求，刷新页面会恢复初始 mock 数据。
-- 真实服务状态接入后，Token、引擎和 Usage 必须由受保护 API 提供，不能复用 mock 逻辑。
-- 引擎最近选择是否持久化到浏览器仍需在真实会话方案确定后实现。
+- Token、引擎、Usage、历史、设置和 MCP Tool 状态由受保护 API 提供，刷新页面会重新读取服务端数据。
+- `src/lib/mock-data.ts` 只保留静态客户端模板和历史原型常量，不参与服务数据读写。
+- 搜索历史快照只保存结果元数据与失败引擎信息，不保存网页正文、Token 或认证信息。
 
 ### 6.3 页面与组件对应
 
 | 页面 | 关键组件 | 数据来源 |
 |------|---------|---------|
-| Login | `LoginForm`, `ErrorAlert` | `POST /api/auth/login` |
+| Login | `LoginScreen`, `ErrorAlert` | `GET /api/auth/oidc/start`、`GET /api/auth/oidc/callback` |
 | Search | `SearchInput`, `EngineSelector`, `LimitSelect`, `AdvancedOptions`, `ResultList`, `ResultCard`, `FailureBanner`, `ReadingPanel`, `HistoryDrawer` | `POST /api/search`, `POST /api/fetch-content` |
-| MCP | `ServiceStatus`, `ToolList`, `TokenTable`, `CreateTokenDialog`, `ConfigTemplate`, `ConnectionTest` | `GET /api/mcp/status`, `/api/tokens` |
+| MCP | `ServiceStatus`, `ToolList`, `TokenTable`, `CreateTokenDialog`, `ConfigTemplate`, `ConnectionTest` | `GET /api/mcp`, `/api/tokens` |
 | Engines | `EngineTable`, `StatusBadge`, `TestDialog` | `GET /api/engines`, `POST /api/engines/:id/test` |
-| Usage | `OverviewCards`, `EngineChart`, `LogTable` | `GET /api/usage/overview`, `GET /api/usage/logs` |
-| Settings | `ProxyForm`, `CacheForm`, `RateLimitForm`, `SearchDefaultsForm`, `DataManagement` | `GET/PATCH /api/settings` |
+| Usage | `OverviewCards`, `EngineChart`, `LogTable` | `GET /api/usage` |
+| Settings | `ProxyForm`, `CacheForm`, `RateLimitForm`, `SearchDefaultsForm`, `DataManagement` | `GET/PUT /api/settings` |
 
 ### 6.4 正文阅读面板
 
@@ -654,15 +666,17 @@ PortalShell     -> Search / MCP / Engines / Usage / Settings 页面 JSX
 
 | Method | Path | Auth | 说明 |
 |--------|------|------|------|
-| POST | `/api/auth/login` | — | 登录 |
-| POST | `/api/auth/logout` | JWT | 登出（清除 Cookie） |
+| GET | `/api/auth/oidc/start` | 网关登录 | 用户点击后发起 OIDC 授权码登录 |
+| GET | `/api/auth/oidc/callback` | 网关登录 | 校验回调并建立应用会话 |
+| POST | `/api/auth/logout` | — | 登出（清除 Cookie） |
+| GET | `/api/auth/me` | 应用会话 Cookie | 返回当前 OIDC 用户 |
 
 ### 7.2 搜索
 
 | Method | Path | Auth | 说明 |
 |--------|------|------|------|
-| POST | `/api/search` | JWT | 聚合搜索 |
-| POST | `/api/fetch-content` | JWT | 抓取网页正文 |
+| POST | `/api/search` | 应用会话 | 按引擎分组并返回兼容的聚合结果 |
+| POST | `/api/fetch-content` | 应用会话 | 抓取网页正文 |
 
 **POST /api/search**
 
@@ -686,8 +700,16 @@ PortalShell     -> Search / MCP / Engines / Usage / Settings 页面 JSX
       "engines": ["bing", "duckduckgo"]
     }
   ],
+  "engineResults": [
+    {
+      "engine": "bing",
+      "limit": 5,
+      "results": [/* 当前引擎的结果 */],
+      "cached": false,
+      "failure": null
+    }
+  ],
   "failures": [
-    { "engine": "brave", "error": "429 Too Many Requests" }
   ],
   "cached": false,
   "resultCount": 8
@@ -698,55 +720,50 @@ PortalShell     -> Search / MCP / Engines / Usage / Settings 页面 JSX
 
 | Method | Path | Auth | 说明 |
 |--------|------|------|------|
-| GET | `/api/engines` | JWT | 引擎列表 |
-| PATCH | `/api/engines/:id` | JWT | 修改引擎配置（enabled, isDefault, searchMode） |
-| POST | `/api/engines/:id/test` | JWT | 测试搜索 |
+| GET | `/api/engines` | 应用会话 | 引擎列表 |
+| PATCH | `/api/engines/:id` | 应用会话 | 修改引擎配置（enabled, isDefault, searchMode, resultLimit；resultLimit 可为 null 清空） |
+| POST | `/api/engines/:id/test` | 应用会话 | 测试搜索 |
 
 ### 7.4 Token 管理
 
 | Method | Path | Auth | 说明 |
 |--------|------|------|------|
-| GET | `/api/tokens` | JWT | Token 列表 |
-| POST | `/api/tokens` | JWT | 创建 Token，返回完整 Secret（仅一次） |
-| PATCH | `/api/tokens/:id` | JWT | 修改状态（disable / enable / revoke） |
-| DELETE | `/api/tokens/:id` | JWT | 删除 Token |
+| GET | `/api/tokens` | 应用会话 | Token 列表 |
+| POST | `/api/tokens` | 应用会话 | 创建 Token，返回完整 Secret（仅一次） |
+| PATCH | `/api/tokens/:id` | 应用会话 | 修改状态（disable / enable / revoke） |
+| DELETE | `/api/tokens/:id` | 应用会话 | 删除 Token |
 
 ### 7.5 系统配置
 
 | Method | Path | Auth | 说明 |
 |--------|------|------|------|
-| GET | `/api/settings` | JWT | 读取全部配置 |
-| PATCH | `/api/settings` | JWT | 批量更新配置 |
-| POST | `/api/settings/proxy/test` | JWT | 测试代理连通性 |
-| POST | `/api/settings/history/clear` | JWT | 清空搜索历史 |
+| GET | `/api/settings` | 应用会话 | 读取全部配置 |
+| PUT | `/api/settings` | 应用会话 | 批量更新配置，并按当前保留策略清理历史 |
+| DELETE | `/api/history` | 应用会话 | 清空搜索历史；不受 `-1` 永久保存影响 |
 
 ### 7.6 Usage
 
 | Method | Path | Auth | 说明 |
 |--------|------|------|------|
-| GET | `/api/usage/overview` | JWT | 概览指标 |
-| GET | `/api/usage/engines` | JWT | 各引擎统计 |
-| GET | `/api/usage/logs` | JWT | 请求日志（分页） |
+| GET | `/api/usage` | 应用会话 | 按时间范围和 Channel/Operation/状态/引擎筛选返回完整统计、趋势和服务端分页审计日志 |
 
 ### 7.7 MCP 管理
 
 | Method | Path | Auth | 说明 |
 |--------|------|------|------|
-| GET | `/api/mcp/status` | JWT | MCP 服务状态 |
-| PATCH | `/api/mcp/tools/:toolName` | JWT | 启停单个 Tool |
-| POST | `/api/mcp/test` | JWT | 连接测试 |
+| GET | `/api/mcp` | 应用会话 | 返回 MCP Endpoint 元数据和 Tool 状态 |
+| PUT | `/api/mcp/tools` | 应用会话 | 批量更新 Tool 启停状态 |
 
 ### 7.8 MCP Endpoint
 
 | Method | Path | Auth | 说明 |
 |--------|------|------|------|
 | POST | `/mcp` | Bearer Token | Streamable HTTP MCP Endpoint |
-| GET | `/mcp/sse` | Bearer Token | Legacy SSE（默认关闭） |
-| POST | `/mcp/messages` | Bearer Token | Legacy SSE 消息接收 |
+| GET/DELETE | `/mcp` | — | 当前实现拒绝非 POST MCP 请求；Legacy SSE 仅保留为后续兼容范围 |
 
-## 8. 部署
+## 8. 历史部署草图（已被 LPK V2 方案取代）
 
-> 当前仓库尚未创建 Docker、Fastify 或懒猫微服文件。下列内容是后端实施前的历史部署规划，其中 Vite 前端构建说明已不适用；当前 Next.js 门户使用 `pnpm build` 生成生产构建。部署方案将在新增服务端与容器文件前重新确认。
+> 当前 LPK V2 的实际口径以第 1.1 节、根目录的 `package.yml`、`lzc-manifest.yml`、`lzc-build.yml` 和 `lzc/` 脚本为准。下列内容仅保留为早期阶段草图，不代表当前实现，也不得用于部署。
 
 ### 8.1 Docker 构建
 
@@ -758,7 +775,7 @@ WORKDIR /app
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/ packages/
 RUN corepack enable pnpm && pnpm install --frozen-lockfile
-RUN pnpm --filter web build        # Vite 构建前端
+RUN pnpm build                     # 当前 Next.js 门户的生产构建；此段仍是部署规划示意
 RUN pnpm --filter server build     # TypeScript 编译后端
 RUN pnpm deploy --filter server --prod /prod  # 生产依赖
 

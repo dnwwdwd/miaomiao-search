@@ -6,6 +6,10 @@ dist/
 build/
 coverage/
 .cache/
+.pnpm-patches/
+.lzc-work/
+lzc-dist/
+release/
 .local-data/
 *.db
 *.sqlite

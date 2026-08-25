@@ -18,7 +18,7 @@ Open-WebSearch 当前公开了本地 daemon HTTP API，适合长期进程调用�
 
 - 工作量：中等，需要一个新服务和约 20 个受影响文件。
 - 风险：上游 HTTP 契约或抓取页面可能变化；用固定版本、健康检查、适配器契约测试和明确错误映射控制影响。
-- 回退：不涉及历史数据转换；停止 `packages/server` 即可回到当前 mock 门户，已创建的 SQLite 文件保留。
+- 回退（历史阶段说明）：不涉及历史数据转换；停止 `packages/server` 可暂时回到原型门户，已创建的 SQLite 文件保留。当前门户已依赖 Fastify API，不把原型数据当作服务数据源。
 - 适配既有设计：保留技术文档中的 Fastify、SQLite、Drizzle 和阶段 3 API 分层，同时避免依赖未公开的上游内部模块。
 
 ### 方案 B：将 Open-WebSearch 源码复制到本仓库后直接抽取模块
@@ -52,7 +52,7 @@ Open-WebSearch 当前公开了本地 daemon HTTP API，适合长期进程调用�
 
 | 表 | 作用 | 关键约束与保留规则 |
 |---|---|---|
-| `admin` | 单管理员账户 | `username` 唯一；只保存 bcrypt 密码哈希；首次启动从 `ADMIN_USERNAME`、`ADMIN_PASSWORD` 写入，之后不再读取明文密码。 |
+| `admin` | 历史单管理员账户 | 已由 `DEC-20260825-006` 和迁移 `0006_remove_legacy_admin` 取代并删除；不再存在本地密码账户。 |
 | `access_token` | MCP Access Token | 只保存 HMAC-SHA-256 值和不可逆 Prefix；状态为 `active`、`disabled` 或 `revoked`；Token 删除只删除 Token 本身，审计日志保留。 |
 | `engine` | 引擎配置与健康结果 | 固定 ID；`enabled`、`is_default`、Bing `search_mode`、健康状态、延迟和最近错误；Bing 仅允许 `auto`、`request`。 |
 | `search_history` | Web 搜索历史 | 保存 query、引擎 JSON、结果数和创建时间；不保存正文；由 `history.enabled` 和保留天数控制写入与清理。 |
@@ -61,7 +61,7 @@ Open-WebSearch 当前公开了本地 daemon HTTP API，适合长期进程调用�
 
 `request_log.token_id` 不设置外键，以保留已删除或已撤销 Token 的审计记录；同时记录不可逆的 `token_prefix`，便于管理员追溯。表中时间统一使用 UTC ISO-8601 文本。为以下查询创建索引：`access_token(hash)`、`search_history(created_at)`、`request_log(created_at)`、`request_log(channel, created_at)`、`request_log(token_id, created_at)`。
 
-JWT 不持久化，使用 `JWT_SECRET` 环境变量签发和验证；Access Token 的 HMAC 使用独立的 `TOKEN_HASH_KEY`，避免 JWT 密钥轮换使既有 Access Token 全部失效。`SETTINGS_ENCRYPTION_KEY` 采用 32 字节 Base64 值；生产模式下缺失任一密钥时拒绝启动。三个密钥均不会写入数据库、日志或 HTTP 响应。
+本段历史密钥方案已由 `DEC-20260825-006` 取代：不再使用 `JWT_SECRET`、`TOKEN_HASH_KEY` 或 `SETTINGS_ENCRYPTION_KEY` 外部环境变量。当前由每实例 `.S.DeployID` 派生 Cookie 签名、应用会话、MCP Token HMAC 与设置加密密钥；这些密钥均不会写入数据库、日志或 HTTP 响应。
 
 ## 拟议迁移与恢复（待确认）
 
@@ -80,7 +80,7 @@ JWT 不持久化，使用 `JWT_SECRET` 环境变量签发和验证；Access Toke
 
 本阶段不创建面向浏览器的 `/api/*` 路由、不修改既有 portal mock、不开通 `/mcp`、不构建 Docker 或懒猫微服产物。这些属于阶段 3 和阶段 4。
 
-依赖：`fastify`、`drizzle-orm`、`drizzle-kit`、`better-sqlite3`、`bcryptjs`、`jose`、`zod`、`@fastify/cookie`、`@fastify/rate-limit`，以及固定版本的 `open-websearch` daemon。不会请求或保存第三方 API Key；运行时需要管理员初始密码、JWT 密钥、Token HMAC 密钥、设置加密密钥，以及可访问但不对公网暴露的 Open-WebSearch daemon。
+依赖：`fastify`、`drizzle-orm`、`drizzle-kit`、`better-sqlite3`、`jose`、`zod`、`@fastify/cookie`、`@fastify/rate-limit`，以及固定版本的 `open-websearch` daemon。运行时由懒猫 OIDC 配置与每实例派生密钥支撑认证；Open-WebSearch 只允许在私有本机地址提供服务。
 
 ## 验证结果
 

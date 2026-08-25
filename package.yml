@@ -1,0 +1,27 @@
+package: cloud.lazycat.app.lazycat-search
+version: 0.1.0
+name: Lazycat Search
+description: Self-hosted multi-engine web search and Remote MCP service.
+author: dnwwdwd
+homepage: https://github.com/dnwwdwd/lazycat-search
+license: Apache-2.0
+min_os_version: "1.5.0"
+unsupported_platforms:
+  - linux/arm64
+  - linux/386
+locales:
+  zh:
+    name: 懒猫搜索
+    description: 多引擎联网搜索与远程 MCP 服务。
+  zh_CN:
+    name: 懒猫搜索
+    description: 多引擎联网搜索与远程 MCP 服务。
+  en:
+    name: Lazycat Search
+    description: Multi-engine web search and Remote MCP service.
+  ja:
+    name: Lazycat Search
+    description: マルチエンジンWeb検索とリモートMCPサービス。
+permissions:
+  required:
+    - net.internet

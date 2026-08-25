@@ -11,7 +11,7 @@ import type { OpenWebSearchClient } from "./upstream/open-websearch.js";
 
 export function buildServer(config: ServerConfig, upstream: OpenWebSearchClient, dependencies: ServerDependencies) {
   const app = Fastify({ logger: config.environment !== "test" });
-  app.register(cookie);
+  app.register(cookie, { secret: config.cookieSecret });
   app.register(cors, {
     origin: config.environment === "production" ? false : config.allowedOrigins,
     credentials: true,

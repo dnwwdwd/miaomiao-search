@@ -76,6 +76,7 @@ export class HttpOpenWebSearchClient implements OpenWebSearchClient {
         title: result.title,
         url: result.url,
         description: result.description,
+        faviconUrl: faviconUrl(result.url),
         engines: this.resultEngines(result),
       })),
       failures: payload.failures.filter((failure): failure is { engine: SearchInput["engines"][number]; code: string; message: string } => engineIds.includes(failure.engine as SearchInput["engines"][number])),
@@ -91,12 +92,18 @@ export class HttpOpenWebSearchClient implements OpenWebSearchClient {
       contentType: z.string().default("text/plain"),
       truncated: z.boolean().default(false),
       content: z.string(),
-    }).transform((value) => ({
-      ...value,
-      finalUrl: value.finalUrl ?? value.url,
-      truncated: value.truncated || value.content.length > input.maxChars,
-      content: value.content.slice(0, input.maxChars),
-      })).parse(await this.request("fetch-web", { ...input, renderMode: "request" }));
+      readableHtml: z.string().optional(),
+    }).transform((value) => {
+      const content = readableTextFromHtml(value.readableHtml, value.content);
+      return {
+        url: value.url,
+        finalUrl: value.finalUrl ?? value.url,
+        title: value.title,
+        contentType: value.contentType,
+        truncated: value.truncated || content.length > input.maxChars,
+        content: content.slice(0, input.maxChars),
+      };
+    }).parse(await this.request("fetch-web", { ...input, renderMode: "request", readability: true }));
     } catch (error) {
       if (error instanceof z.ZodError) throw new DomainError("UPSTREAM_INVALID_RESPONSE", "上游服务返回格式无效", 502);
       throw error;
@@ -153,4 +160,28 @@ export class HttpOpenWebSearchClient implements OpenWebSearchClient {
     }
     return new TextDecoder().decode(Buffer.concat(chunks));
   }
+}
+
+function faviconUrl(value: string): string {
+  const url = new URL(value);
+  return `${url.origin}/favicon.ico`;
+}
+
+function readableTextFromHtml(html: string | undefined, fallback = ""): string {
+  if (!html) return fallback;
+  const text = html
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<\/?(?:p|div|section|article|h[1-6]|li|br)\b[^>]*>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;|&#160;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return text || fallback;
 }

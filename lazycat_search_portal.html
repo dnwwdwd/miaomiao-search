@@ -68,7 +68,6 @@
         .engine-tag-csdn { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
         .engine-tag-juejin { background: #eff6ff; color: #2563eb; border-color: #bfdbfe; }
         .engine-tag-sogou { background: #fef3c7; color: #b45309; border-color: #fde68a; }
-        .engine-tag-startpage { background: #e0e7ff; color: #3730a3; border-color: #c7d2fe; }
     </style>
 </head>
 <body class="mesh-gradient-bg text-slate-800 antialiased h-screen overflow-hidden flex flex-col font-sans selection:bg-blue-600 selection:text-white">
@@ -969,7 +968,6 @@
                     { key: 'brave', name: 'Brave', enabled: true, isDefault: false, mode: 'System', lastTest: '12 分钟前', health: 'Rate Limited', latency: '450ms', error: '429 Too Many Requests', tagClass: 'engine-tag-brave' },
                     { key: 'csdn', name: 'CSDN', enabled: false, isDefault: false, mode: 'System', lastTest: '18 分钟前', health: 'Disabled', latency: '-', error: '-', tagClass: 'engine-tag-csdn' },
                     { key: 'juejin', name: 'Juejin', enabled: true, isDefault: false, mode: 'System', lastTest: '25 分钟前', health: 'Unknown', latency: '-', error: '尚未测试', tagClass: 'engine-tag-juejin' },
-                    { key: 'startpage', name: 'Startpage', enabled: true, isDefault: false, mode: 'System', lastTest: '31 分钟前', health: 'Healthy', latency: '280ms', error: '-', tagClass: 'engine-tag-startpage' }
                 ],
                 mcpTools: [
                     { name: 'search', desc: '多引擎聚合搜索工具，支持返回结构化条目与去重', params: 'query (string), limit (int), engines (array), searchMode (string)', enabled: true, isCore: true },
@@ -1006,7 +1004,6 @@
                     { id: 'req_5b2d88c', channel: 'MCP', op: 'search', token: 'ows_live_3c21...', engines: 'Baidu', latency: '210ms', cache: 'HIT', resultCount: 5, status: '200 OK', errorCode: '-', createdAt: '2026-08-23 10:36' },
                     { id: 'req_1e9a34f', channel: 'MCP', op: 'fetchCsdnArticle', token: 'ows_live_8f93...', engines: '-', latency: '180ms', cache: 'MISS', resultCount: '-', status: '200 OK', errorCode: '-', createdAt: '2026-08-23 10:31' },
                     { id: 'req_0d8c76b', channel: 'Web', op: 'search', token: 'Admin Session', engines: 'Brave', latency: '380ms', cache: 'MISS', resultCount: 0, status: '429', errorCode: 'ENGINE_RATE_LIMITED', createdAt: '2026-08-23 10:28' },
-                    { id: 'req_c1d938f', channel: 'MCP', op: 'search', token: 'ows_live_8f93...', engines: 'Startpage', latency: '510ms', cache: 'MISS', resultCount: 3, status: '200 OK', errorCode: '-', createdAt: '2026-08-23 10:20' },
                     { id: 'req_a7f4d2e', channel: 'Web', op: 'fetchWebContent', token: 'Admin Session', engines: '-', latency: '34ms', cache: 'MISS', resultCount: '-', status: '403', errorCode: 'SSRF_BLOCKED', createdAt: '2026-08-23 10:14' }
                 ]
             },
@@ -1381,7 +1378,6 @@
                 if (nameLower.includes('brave')) return 'engine-tag-brave';
                 if (nameLower.includes('csdn')) return 'engine-tag-csdn';
                 if (nameLower.includes('juejin')) return 'engine-tag-juejin';
-                if (nameLower.includes('startpage')) return 'engine-tag-startpage';
                 return 'bg-slate-100 text-slate-700 border-slate-200';
             },
 

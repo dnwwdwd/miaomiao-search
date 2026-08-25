@@ -1,0 +1,64 @@
+application:
+  subdomain: lazycat-search
+  multi_instance: true
+  oidc_redirect_path: /api/auth/oidc/callback
+  public_path:
+    - /mcp
+  routes:
+    - /=http://web.cloud.lazycat.app.lazycat-search.lzcapp:3000
+  upstreams:
+    - location: /api/
+      backend: http://api.cloud.lazycat.app.lazycat-search.lzcapp:3001
+      disable_trim_location: true
+      use_backend_host: true
+    - location: /mcp
+      backend: http://api.cloud.lazycat.app.lazycat-search.lzcapp:3001
+      disable_trim_location: true
+      use_backend_host: true
+
+services:
+  web:
+    image: registry.lazycat.cloud/u30387910/library/node:549f023f95a10c59
+    command: sh /lzcapp/pkg/content/lzc/run-web.sh
+    environment:
+      - NODE_ENV=production
+      - HOSTNAME=0.0.0.0
+      - PORT=3000
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - node -e "fetch('http://127.0.0.1:3000/').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+  api:
+    image: registry.lazycat.cloud/u30387910/library/node:549f023f95a10c59
+    command: sh /lzcapp/pkg/content/lzc/run-api.sh
+    user: "0"
+    binds:
+      - /lzcapp/var/lazycat-search/data:/lzcapp/var/lazycat-search/data
+    environment:
+      - NODE_ENV=production
+      - DATA_DIR=/lzcapp/var/lazycat-search/data
+      - SERVER_HOST=0.0.0.0
+      - PORT=3001
+      - OPEN_WEBSEARCH_URL=http://127.0.0.1:3210
+      - APP_ORIGIN=https://{{ .S.AppDomain }}
+      - APP_INSTANCE_SECRET={{ stable_secret (printf "lazycat-search:%s" .S.DeployID) }}
+      - OIDC_CLIENT_ID=${LAZYCAT_AUTH_OIDC_CLIENT_ID}
+      - OIDC_CLIENT_SECRET=${LAZYCAT_AUTH_OIDC_CLIENT_SECRET}
+      - OIDC_ISSUER_URI=${LAZYCAT_AUTH_OIDC_ISSUER_URI}
+      - OIDC_AUTH_URI=${LAZYCAT_AUTH_OIDC_AUTH_URI}
+      - OIDC_TOKEN_URI=${LAZYCAT_AUTH_OIDC_TOKEN_URI}
+      - OIDC_USERINFO_URI=${LAZYCAT_AUTH_OIDC_USERINFO_URI}
+      - ALLOWED_HOSTS=api.cloud.lazycat.app.lazycat-search.lzcapp
+      - ALLOWED_ORIGINS=https://{{ .S.AppDomain }}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - node -e "fetch('http://127.0.0.1:3001/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s

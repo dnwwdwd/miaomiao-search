@@ -3,7 +3,7 @@ import Script from "next/script";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "lazycat-search Portal",
+  title: "Lazycat Search",
   description: "Self-hosted multi-engine search and MCP management portal.",
 };
 

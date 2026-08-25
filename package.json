@@ -2,8 +2,9 @@
   "name": "lazycat-search",
   "version": "0.1.0",
   "private": true,
+  "license": "Apache-2.0",
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev --webpack",
     "build": "pnpm --filter @lazycat-search/server build && next build",
     "start": "next start",
     "lint": "eslint .",
