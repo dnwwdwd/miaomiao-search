@@ -25,6 +25,59 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.login-screen {
+  background: #f7f9fd;
+  isolation: isolate;
+}
+
+.login-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background: radial-gradient(circle at 10% 8%, rgba(59, 130, 246, 0.14), transparent 32%), radial-gradient(circle at 90% 92%, rgba(14, 165, 233, 0.1), transparent 30%);
+}
+
+.login-orbit {
+  position: absolute;
+  z-index: -1;
+  border-radius: 9999px;
+  pointer-events: none;
+}
+
+.login-orbit-one {
+  top: 12%;
+  right: 9%;
+  width: 17rem;
+  height: 17rem;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.08), 0 0 0 22px rgba(59, 130, 246, 0.035), 0 0 0 48px rgba(59, 130, 246, 0.02);
+}
+
+.login-orbit-two {
+  bottom: 8%;
+  left: 4%;
+  width: 9rem;
+  height: 9rem;
+  box-shadow: 0 0 0 1px rgba(14, 165, 233, 0.09), 0 0 0 16px rgba(14, 165, 233, 0.03);
+}
+
+.login-panel {
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 2rem;
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.12), 0 8px 22px rgba(37, 99, 235, 0.06);
+  backdrop-filter: blur(18px);
+}
+
+.login-brand-mark { transition: transform 180ms ease, box-shadow 180ms ease; }
+.login-brand-mark:hover { transform: translateY(-2px) rotate(-3deg); box-shadow: 0 14px 28px rgba(37, 99, 235, 0.22); }
+.login-rule { height: 2px; border-radius: 9999px; background: #2563eb; }
+
+@media (max-width: 640px) {
+  .login-orbit-one { top: 7%; right: -6rem; }
+  .login-orbit-two { bottom: 4%; left: -3rem; }
+  .login-panel { border-radius: 1.5rem; }
+}
+
 button, input, select { font: inherit; touch-action: manipulation; }
 
 input, select, textarea { font-size: 13px !important; }
@@ -38,6 +91,13 @@ input, select, textarea { font-size: 13px !important; }
 .table-scroll {
   scrollbar-color: #94a3b8 #e2e8f0;
   scrollbar-width: auto;
+  overscroll-behavior-x: contain;
+}
+
+/* The audit card scrolls as one unit so its horizontal track stays below the
+   filters, rows, and pagination instead of stopping halfway through the card. */
+.audit-table-scroll {
+  scrollbar-gutter: stable;
 }
 
 .table-scroll::-webkit-scrollbar { width: 12px; height: 12px; }
@@ -119,7 +179,7 @@ input, select, textarea { font-size: 13px !important; }
 
 .usage-hero {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .usage-hero::after {
@@ -156,6 +216,19 @@ input, select, textarea { font-size: 13px !important; }
 .history-detail-modal button {
   -webkit-tap-highlight-color: transparent;
 }
+
+.reader-modal {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  box-shadow: 0 28px 90px rgba(15, 23, 42, 0.24), 0 8px 24px rgba(37, 99, 235, 0.08);
+}
+
+.reader-content {
+  scrollbar-color: #94a3b8 #f8fafc;
+  scrollbar-width: auto;
+}
+
+.reader-content::-webkit-scrollbar-track { background: #f8fafc; }
+.reader-content::-webkit-scrollbar-thumb { background: #94a3b8; border-color: #f8fafc; }
 
 .search-page select { min-height: 0; font-weight: 500; }
 .usage-page select { min-height: 0; }

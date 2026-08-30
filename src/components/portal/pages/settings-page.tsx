@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Dropdown } from "@/components/ui/dropdown";
 import { Switch } from "@/components/ui/switch";
 import { Icon } from "@/components/ui/icon";
-import { EngineTag } from "@/components/ui/engine-tag";
 import { usePortal } from "@/components/portal/portal-context";
+import { Tag } from "@/components/ui/tag";
+import { useState, type FormEvent } from "react";
 import type { SettingsState } from "@/types/portal";
 
 function NumberField({ label, value, onChange, help }: { label: string; value: number; onChange: (value: number) => void; help?: string }) {
@@ -23,8 +24,12 @@ function NumberField({ label, value, onChange, help }: { label: string; value: n
 
 
 export function SettingsPage() {
-  const { settings, setSettings, engines, locale, notify, refresh } = usePortal();
+  const { settings, setSettings, locale, notify, refresh, user } = usePortal();
   const english = locale === "en";
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [savingPassword, setSavingPassword] = useState(false);
   const update = <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => setSettings((current) => ({ ...current, [key]: value }));
   const save = async () => {
     try {
@@ -45,41 +50,39 @@ export function SettingsPage() {
       notify(error instanceof Error ? error.message : "清除失败", "error");
     }
   };
-  const testProxy = () => {
-    if (!settings.proxyEnabled || !settings.proxyUrl) {
-      notify(english ? "Enable the proxy and enter its URL first." : "请先启用代理并填写地址。", "error");
-      return;
-    }
+  const savePassword = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (newPassword.length < 8) { notify(english ? "Password must be at least 8 characters." : "密码至少需要 8 位。", "error"); return; }
+    if (newPassword !== confirmPassword) { notify(english ? "The passwords do not match." : "两次输入的密码不一致。", "error"); return; }
+    setSavingPassword(true);
     try {
-      new URL(settings.proxyUrl);
-      notify(english ? "URL format is valid. This local runtime has no standalone proxy-test endpoint." : "代理地址格式有效；当前本地运行时未提供独立的代理测试接口。", "info");
-    } catch {
-      notify(english ? "Enter a complete proxy URL." : "请输入完整的代理地址。", "error");
-    }
-  };
-  const toggleDefault = async (id: string, isDefault: boolean) => {
-    try {
-      await api.updateEngine(id, { isDefault });
-      await refresh();
+      await api.changePassword({ currentPassword: user?.loginMethod === "local" ? currentPassword : undefined, newPassword });
+      setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
+      if (typeof window !== "undefined") window.location.replace(new URL("/login", window.location.origin).toString());
     } catch (error) {
-      notify(error instanceof Error ? error.message : "更新失败", "error");
+      notify(error instanceof Error ? error.message : (english ? "Could not update password." : "密码更新失败。"), "error");
+    } finally {
+      setSavingPassword(false);
     }
   };
   const t = english
-    ? { title: "System settings", subtitle: "Configure proxy, cache, limits, and retention.", cache: "Cache policy", rate: "Rate limits", defaults: "Search defaults", data: "Data management", save: "Save settings" }
-    : { title: "系统参数配置", subtitle: "配置代理、缓存、限流和数据保留。", cache: "缓存策略", rate: "限流策略", defaults: "默认搜索参数", data: "数据管理与审计隐私", save: "保存设置" };
+    ? { title: "System settings", subtitle: "Configure cache, limits, and retention.", account: "Signed-in account", method: "Login method", oidc: "Lazycat OIDC", local: "Local account", passwordTitle: "Password", passwordHint: "OIDC sessions can set a new password directly. Local sessions must confirm the current password.", currentPassword: "Current password", newPassword: "New password", confirmPassword: "Confirm password", savePassword: "Update password", cache: "Cache policy", rate: "Rate limits", data: "Data management", save: "Save settings" }
+    : { title: "系统参数配置", subtitle: "配置缓存、限流和数据保留。", account: "当前登录账户", method: "登录方式", oidc: "懒猫 OIDC", local: "本地账户", passwordTitle: "修改密码", passwordHint: "OIDC 登录可直接设置新密码；本地登录需要先验证当前密码。", currentPassword: "当前密码", newPassword: "新密码", confirmPassword: "确认新密码", savePassword: "更新密码", cache: "缓存策略", rate: "限流策略", data: "数据管理与审计隐私", save: "保存设置" };
 
   return (
-    <section className="mx-auto max-w-5xl space-y-6 pb-20">
+    <section className="mx-auto w-full max-w-none space-y-6 pb-20">
       <div><h1 className="text-2xl font-extrabold tracking-tight text-slate-900">{t.title}</h1><p className="mt-1 text-xs text-slate-500">{t.subtitle}</p></div>
 
-      <Card className="white-card space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div><h2 className="flex items-center text-sm font-bold text-slate-900"><Icon name="globe" weight="fill" className="mr-2 text-lg text-blue-600" />{english ? "Network & Proxy (Search Runtime Proxy)" : "网络与代理 (Search Runtime Proxy)"}</h2><p className="mt-0.5 text-xs text-slate-500">{english ? "Used only for outbound HTTP requests to search engines. Passwords are masked automatically." : "仅用于向搜索引擎发起外网 HTTP 请求。密码自动脱敏显示。"}</p></div>
-          <Switch size="md" label={english ? "Enable proxy" : "启用搜索代理"} checked={settings.proxyEnabled} onChange={(value) => update("proxyEnabled", value)} />
-        </div>
-        <div className="space-y-3 text-xs"><label className="block text-slate-700"><span className="mb-1 block font-semibold">Proxy URL</span><div className="flex gap-2"><Input className="flex-1 font-mono" disabled={!settings.proxyEnabled} placeholder="http://admin:••••••••@10.0.0.5:7890" value={settings.proxyUrl} onChange={(event) => update("proxyUrl", event.target.value)} /><Button variant="secondary" className="shrink-0 rounded-xl" onClick={testProxy}>{english ? "Test proxy" : "测试代理"}</Button></div></label></div>
-      </Card>
+      <div className="grid gap-4 md:grid-cols-[1.05fr_1fr]">
+        <Card className="white-card rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+          <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4"><div><h2 className="flex items-center text-sm font-bold text-slate-900"><Icon name="user-circle" weight="fill" className="mr-2 text-lg text-blue-600" />{t.account}</h2><p className="mt-1 text-xs text-slate-500">{user?.name ?? "—"}</p></div><Tag tone="blue">{user?.loginMethod === "local" ? t.local : t.oidc}</Tag></div>
+          <dl className="mt-4 grid grid-cols-2 gap-4 text-xs"><div><dt className="text-slate-400">{english ? "Account" : "账号"}</dt><dd className="mt-1 break-all font-mono font-bold text-slate-800">{user?.account ?? "—"}</dd></div><div><dt className="text-slate-400">{t.method}</dt><dd className="mt-1 font-semibold text-slate-700">{user?.loginMethod === "local" ? t.local : t.oidc}</dd></div></dl>
+        </Card>
+        <Card className="white-card rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+          <div className="border-b border-slate-100 pb-3"><h2 className="flex items-center text-sm font-bold text-slate-900"><Icon name="key" weight="fill" className="mr-2 text-lg text-blue-600" />{t.passwordTitle}</h2><p className="mt-1 text-xs leading-5 text-slate-500">{t.passwordHint}</p></div>
+          <form className="mt-4 space-y-3" onSubmit={(event) => void savePassword(event)}>{user?.loginMethod === "local" ? <label className="block text-xs font-semibold text-slate-700"><span className="mb-1 block">{t.currentPassword}</span><Input type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} /></label> : null}<label className="block text-xs font-semibold text-slate-700"><span className="mb-1 block">{t.newPassword}</span><Input type="password" autoComplete="new-password" minLength={8} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} /></label><label className="block text-xs font-semibold text-slate-700"><span className="mb-1 block">{t.confirmPassword}</span><Input type="password" autoComplete="new-password" minLength={8} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /></label><div className="flex justify-end pt-1"><Button type="submit" disabled={savingPassword || !newPassword || !confirmPassword} className="rounded-xl">{savingPassword ? (english ? "Updating…" : "更新中…") : t.savePassword}</Button></div></form>
+        </Card>
+      </div>
 
       <Card className="white-card space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
         <div className="border-b border-slate-100 pb-3"><h2 className="flex items-center text-sm font-bold text-slate-900"><Icon name="hard-drives" weight="fill" className="mr-2 text-lg text-blue-600" />{t.cache}</h2><p className="mt-0.5 text-xs text-slate-500">{english ? "Search cache keys include query + engines + limit + search mode. Web and MCP share the same policy." : "搜索缓存 Key 包含 query + engines + limit + searchMode。MCP 与 Web 共用缓存。"}</p></div>
@@ -89,11 +92,6 @@ export function SettingsPage() {
       <Card className="white-card space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
         <div className="border-b border-slate-100 pb-3"><h2 className="flex items-center text-sm font-bold text-slate-900"><Icon name="speedometer" weight="fill" className="mr-2 text-lg text-blue-600" />{t.rate}</h2><p className="mt-0.5 text-xs text-slate-500">{english ? "Limit the request pace for Web, MCP, and each search engine separately." : "分别限制 Web、MCP 与单个搜索引擎的请求节奏。"}</p></div>
         <div className="grid grid-cols-1 gap-4 text-xs md:grid-cols-3"><NumberField label={english ? "Web / IP (per minute)" : "Web / IP（每分钟）"} value={settings.webRpm} onChange={(value) => update("webRpm", value)} /><NumberField label={english ? "MCP / Token (per minute)" : "MCP / Token（每分钟）"} value={settings.mcpRpm} onChange={(value) => update("mcpRpm", value)} /><NumberField label={english ? "Per-engine concurrency" : "单引擎并发"} value={settings.engineConcurrency} onChange={(value) => update("engineConcurrency", value)} /></div>
-      </Card>
-
-      <Card className="white-card space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
-        <div className="border-b border-slate-100 pb-3"><h2 className="flex items-center text-sm font-bold text-slate-900"><Icon name="sliders" weight="fill" className="mr-2 text-lg text-blue-600" />{t.defaults}</h2></div>
-        <div className="grid grid-cols-1 gap-4 text-xs md:grid-cols-2"><div className="md:col-span-2"><label className="mb-2 block font-semibold text-slate-700">{english ? "Default engines" : "默认搜索引擎"}</label><div className="flex flex-wrap gap-2">{engines.map((engine) => <EngineDefaultButton key={engine.id} name={engine.name} checked={engine.isDefault} onClick={() => void toggleDefault(engine.id, !engine.isDefault)} />)}</div></div><label className="block font-semibold text-slate-700">{english ? "Search default result count" : "搜索默认返回数"}<Dropdown containerClassName="mt-1 w-full" className="w-full font-mono" value={settings.defaultLimit} onChange={(value) => update("defaultLimit", value)} ariaLabel={english ? "Search default result count" : "搜索默认返回数"} options={[{ value: 5, label: `5 ${english ? "results" : "条"}` }, { value: 10, label: `10 ${english ? "(search default)" : "条（搜索默认）"}` }, { value: 20, label: `20 ${english ? "results" : "条"}` }, { value: 30, label: `30 ${english ? "results" : "条"}` }, { value: 50, label: `50 ${english ? "results" : "条"}` }]} /></label><div><span className="mb-1 block font-semibold text-slate-700">Bing {english ? "default Search Mode" : "默认 Search Mode"}</span><div className="rounded-xl border border-slate-200 bg-slate-100 px-3.5 py-2 font-mono text-slate-600">Request Mode（原生 HTTP）</div></div></div>
       </Card>
 
       <Card className="white-card space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
@@ -108,8 +106,4 @@ export function SettingsPage() {
 
 function ToggleRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
   return <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-2"><span className="font-semibold text-slate-700">{label}</span><Switch size="md" label={label} checked={checked} onChange={onChange} /></div>;
-}
-
-function EngineDefaultButton({ name, checked, onClick }: { name: string; checked: boolean; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className={`rounded-xl transition-[box-shadow,transform] active:scale-[0.98] ${checked ? "ring-2 ring-blue-500/20" : "opacity-60 grayscale hover:opacity-100"}`} aria-pressed={checked}><EngineTag engine={name} compact /></button>;
 }

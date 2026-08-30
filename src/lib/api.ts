@@ -1,15 +1,30 @@
-import type { McpToken, McpTool, SearchEngine, SearchEngineResultGroup, SearchHistory, SettingsState, UsageData, UsageQuery } from "@/types/portal";
+import type { McpToken, McpTool, PortalUser, SearchEngine, SearchEngineResultGroup, SearchHistory, SettingsState, UsageData, UsageQuery } from "@/types/portal";
 
 const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 type ApiError = { error?: { code?: string; message?: string } };
 
-export class ApiClientError extends Error { constructor(public readonly code: string, message: string) { super(message); } }
+export class ApiClientError extends Error {
+  constructor(public readonly code: string, message: string, public readonly statusCode?: number) {
+    super(message);
+    this.name = "ApiClientError";
+  }
+}
+
+const sessionErrorCodes = new Set(["SESSION_UNAUTHORIZED", "GATEWAY_USER_MISSING", "GATEWAY_USER_MISMATCH", "IDENTITY_NOT_FOUND"]);
+
+function notifySessionExpired(): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("miaomiao-search:session-expired"));
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${baseUrl}${path}`, { ...init, credentials: "include", headers: { "content-type": "application/json", ...(init?.headers ?? {}) } });
   const body = await response.json().catch(() => ({})) as ApiError & T;
-  if (!response.ok) throw new ApiClientError(body.error?.code ?? "REQUEST_FAILED", body.error?.message ?? "服务请求失败");
+  if (!response.ok) {
+    const code = body.error?.code ?? "REQUEST_FAILED";
+    if (sessionErrorCodes.has(code) && path !== "/api/auth/logout") notifySessionExpired();
+    throw new ApiClientError(code, body.error?.message ?? "服务请求失败", response.status);
+  }
   return body as T;
 }
 
@@ -19,13 +34,15 @@ const tokenStatus = (value: string): McpToken["status"] => value === "active" ? 
 
 export const api = {
   logout: () => request<{ ok: true }>("/api/auth/logout", { method: "POST" }),
-  me: () => request<{ user: { id: string; name: string; role: "ADMIN" | "NORMAL" } }>("/api/auth/me"),
+  me: () => request<{ user: PortalUser }>("/api/auth/me").then((value) => value.user),
+  localLogin: (account: string, password: string) => request<{ user: PortalUser }>("/api/auth/local/login", { method: "POST", body: JSON.stringify({ account, password }) }).then((value) => value.user),
+  changePassword: (input: { currentPassword?: string; newPassword: string }) => request<{ ok: true; reloginRequired: true }>("/api/auth/password", { method: "PUT", body: JSON.stringify(input) }),
   search: (input: { query: string; engines: string[]; limit?: number; searchMode?: "auto" | "request" }) => request<{ results: Array<{ title: string; url: string; description: string; faviconUrl?: string; engines: string[] }>; engineResults: Array<{ engine: string; limit: number; results: Array<{ title: string; url: string; description: string; faviconUrl?: string; engines: string[] }>; cached: boolean; failure?: { engine: string; code: string; message: string } }>; resultCount: number; failures: Array<{ engine: string; code: string; message: string }>; cached: boolean; requestId: string }>("/api/search", { method: "POST", body: JSON.stringify(input) }),
-  fetchContent: (url: string, maxChars = 50_000) => request<{ content: { url: string; finalUrl: string; title: string; contentType: string; truncated: boolean; content: string }; cached: boolean }>("/api/fetch-content", { method: "POST", body: JSON.stringify({ url, maxChars }) }),
+  fetchContent: (url: string, maxChars = 50_000) => request<{ content: { url: string; finalUrl: string; title: string; contentType: string; truncated: boolean; content: string; retrievalMethod?: string; extractionMethod?: string; readabilityApplied?: boolean }; cached: boolean; requestId: string }>("/api/fetch-content", { method: "POST", body: JSON.stringify({ url, maxChars }) }),
   engines: async (): Promise<SearchEngine[]> => (await request<{ engines: Array<Record<string, unknown>> }>("/api/engines")).engines.map((item) => ({ id: String(item.id), name: engineNames[String(item.id)] ?? String(item.id), enabled: Boolean(item.enabled), isDefault: Boolean(item.isDefault), mode: item.searchMode === "request" ? "Request" : item.searchMode === "auto" ? "Auto" : "—", resultLimit: typeof item.resultLimit === "number" ? item.resultLimit : null, health: engineHealth(String(item.status), Boolean(item.enabled)), latency: typeof item.latencyMs === "number" ? item.latencyMs : null, lastError: typeof item.lastError === "string" ? item.lastError : "—", lastTestAt: typeof item.lastTestAt === "string" ? item.lastTestAt : "—", requiresProxy: Boolean(item.requiresProxy), requiresApiKey: Boolean(item.requiresApiKey), apiKeyConfigured: Boolean(item.apiKeyConfigured) })),
   updateEngine: (id: string, patch: object) => request(`/api/engines/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
-  testEngine: (id: string, query: string) => request<{ resultCount: number; latencyMs: number }>(`/api/engines/${id}/test`, { method: "POST", body: JSON.stringify({ query }) }),
-  tokens: async (): Promise<McpToken[]> => (await request<{ tokens: Array<Record<string, unknown>> }>("/api/tokens")).tokens.map((item) => ({ id: String(item.id), name: String(item.name), prefix: String(item.prefix), scope: item.scope as McpToken["scope"], rpmLimit: typeof item.rpmLimit === "number" ? item.rpmLimit : 0, dailyLimit: typeof item.dailyLimit === "number" ? item.dailyLimit : 0, createdAt: String(item.createdAt), expiresAt: typeof item.expiresAt === "string" ? item.expiresAt : "—", lastUsedAt: typeof item.lastUsedAt === "string" ? item.lastUsedAt : "—", usageToday: 0, status: tokenStatus(String(item.status)) })),
+  testEngine: (id: string, query: string) => request<{ resultCount: number; latencyMs: number; failure?: { code: string; message: string } }>(`/api/engines/${id}/test`, { method: "POST", body: JSON.stringify({ query }) }),
+  tokens: async (): Promise<McpToken[]> => (await request<{ tokens: Array<Record<string, unknown>> }>("/api/tokens")).tokens.map((item) => ({ id: String(item.id), name: String(item.name), prefix: String(item.prefix), scope: item.scope as McpToken["scope"], rpmLimit: typeof item.rpmLimit === "number" ? item.rpmLimit : null, dailyLimit: typeof item.dailyLimit === "number" ? item.dailyLimit : null, createdAt: String(item.createdAt), expiresAt: typeof item.expiresAt === "string" ? item.expiresAt : "—", lastUsedAt: typeof item.lastUsedAt === "string" ? item.lastUsedAt : "—", usageToday: typeof item.usageToday === "number" ? item.usageToday : 0, status: tokenStatus(String(item.status)) })),
   createToken: (input: object) => request<{ id: string; secret: string; prefix: string; expiresAt: string | null }>("/api/tokens", { method: "POST", body: JSON.stringify(input) }),
   updateToken: (id: string, status: string) => request(`/api/tokens/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
   deleteToken: (id: string) => request(`/api/tokens/${id}`, { method: "DELETE" }),

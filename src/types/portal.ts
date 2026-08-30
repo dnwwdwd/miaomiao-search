@@ -1,4 +1,6 @@
 export type Locale = "zh" | "en";
+export type LoginMethod = "oidc" | "local";
+export type PortalUser = { id: string; account: string; name: string; role: "ADMIN" | "NORMAL"; loginMethod: LoginMethod };
 export type ServiceStatus = "checking" | "online" | "offline";
 export type PortalTab = "search" | "mcp" | "engines" | "usage" | "settings";
 export type EngineHealth = "Healthy" | "Degraded" | "Rate Limited" | "Blocked" | "Unavailable" | "Disabled" | "Unknown";
@@ -26,7 +28,7 @@ export type SearchResult = { id: string; title: string; url: string; description
 export type SearchFailure = { engine: string; code: string; message: string };
 export type SearchEngineResultGroup = { engine: string; limit: number; results: SearchResult[]; cached: boolean; failure?: SearchFailure };
 export type SearchHistory = { id: string; query: string; engines: string[]; count: number; results: SearchResult[]; engineResults: SearchEngineResultGroup[]; failures: SearchFailure[]; createdAt: string };
-export type McpToken = { id: string; name: string; prefix: string; scope: "all" | "search" | "fetch"; rpmLimit: number; dailyLimit: number; createdAt: string; expiresAt: string; lastUsedAt: string; usageToday: number; status: TokenStatus };
+export type McpToken = { id: string; name: string; prefix: string; scope: "all" | "search" | "fetch"; rpmLimit: number | null; dailyLimit: number | null; createdAt: string; expiresAt: string; lastUsedAt: string; usageToday: number; status: TokenStatus };
 export type McpTool = { id: string; name: string; description: string; parameters: string; enabled: boolean; siteSpecific?: boolean };
 export type UsageLog = { id: string; channel: "Web" | "MCP"; operation: string; token: string; engines: string[]; latency: number; cacheHit: boolean; resultCount: number; status: "Success" | "Partial" | "Error"; errorCode: string; createdAt: string };
 export type UsageQuery = { from: string; to: string; channel: "all" | "web" | "mcp"; operation?: string; status: "all" | "success" | "partial" | "error"; engine?: string; page: number; pageSize: number; timeZone: string };
@@ -41,4 +43,4 @@ export type UsageData = {
   logs: UsageLog[];
   pagination: { page: number; pageSize: number; total: number; totalPages: number };
 };
-export type SettingsState = { proxyEnabled: boolean; proxyUrl: string; searchCacheEnabled: boolean; contentCacheEnabled: boolean; searchTtl: number; contentTtl: number; cacheMaxSize: number; webRpm: number; mcpRpm: number; engineConcurrency: number; defaultLimit: number; homeEngines: string[]; homeRequestLimit: number | null; homeBingMode: "auto" | "request"; historyEnabled: boolean; historyRetentionDays: number; logFullQuery: boolean };
+export type SettingsState = { proxyEnabled: boolean; proxyUrl: string; searchCacheEnabled: boolean; contentCacheEnabled: boolean; searchTtl: number; contentTtl: number; cacheMaxSize: number; webRpm: number; mcpRpm: number; engineConcurrency: number; defaultLimit: number; homeEngines: string[]; homeEngineOrder: string[]; mcpEngineOrder: string[]; homeRequestLimit: number | null; homeBingMode: "auto" | "request"; historyEnabled: boolean; historyRetentionDays: number; logFullQuery: boolean };

@@ -28,7 +28,7 @@ export function PortalShell({ active, onNavigate, locale, onLocaleChange, onLogo
   const cacheHits = usageLogs.filter((log) => log.cacheHit).length;
   const cacheRate = usageLogs.length ? Math.round((cacheHits / usageLogs.length) * 100) : 0;
   const enabled = engines.filter((engine) => engine.enabled).length;
-  const appName = locale === "zh" ? "懒猫搜索" : "Lazycat Search";
+  const appName = locale === "zh" ? "喵喵搜索" : "Miaomiao Search";
   const statusText = serviceStatus === "online"
     ? (locale === "zh" ? "服务在线" : "Service online")
     : serviceStatus === "offline"
@@ -39,7 +39,7 @@ export function PortalShell({ active, onNavigate, locale, onLocaleChange, onLogo
     <div className="flex h-screen w-full flex-col overflow-hidden bg-slate-50 text-slate-800">
       <header className="z-30 flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 text-xs shadow-2xs md:px-5">
         <div className="flex min-w-0 items-center gap-3">
-          <Image src="/icon.png" alt="Lazycat Search" width={32} height={32} className="size-8 shrink-0 rounded-xl object-cover shadow-md shadow-blue-500/20" priority />
+          <Image src="/icon.png" alt="Miaomiao Search" width={32} height={32} className="size-8 shrink-0 rounded-xl object-cover shadow-md shadow-blue-500/20" priority />
           <span className="truncate text-sm font-extrabold tracking-tight text-slate-900">{appName}</span>
         </div>
         <div className="flex shrink-0 items-center gap-2 md:gap-3">
@@ -58,7 +58,7 @@ export function PortalShell({ active, onNavigate, locale, onLocaleChange, onLogo
           </nav>
           <div className="m-3 hidden space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs md:block"><div className="flex items-center justify-between text-slate-600"><span className="text-[11px] font-medium">{locale === "zh" ? "缓存命中率" : "Cache hit rate"}</span><span className="font-mono font-bold text-blue-600">{cacheRate}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-blue-600 transition-[width]" style={{ width: `${cacheRate}%` }} /></div><div className="flex justify-between pt-1 text-[10px] text-slate-400"><span>SQLite: 7.2 MB</span></div></div>
         </aside>
-        <main className="portal-main min-w-0 flex-1 overflow-y-auto bg-slate-50/50 p-4 md:p-8"><div className="mx-auto w-full max-w-5xl pb-16">{children}</div></main>
+        <main className="portal-main min-w-0 flex-1 overflow-y-auto bg-slate-50/50 p-4 md:p-8"><div className="mx-auto w-full max-w-none pb-16 md:w-[90%]">{children}</div></main>
       </div>
     </div>
   );

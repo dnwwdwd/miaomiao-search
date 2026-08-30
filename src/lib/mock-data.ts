@@ -46,12 +46,12 @@ export const initialUsageLogs: UsageLog[] = [
   { id: "req_01HZYKX2", channel: "Web", operation: "search", token: "—", engines: ["Sogou"], latency: 0, cacheHit: false, resultCount: 0, status: "Error", errorCode: "ENGINE_RATE_LIMIT", createdAt: "2026-08-23 15:12:35" },
 ];
 
-export const initialSettings: SettingsState = { proxyEnabled: true, proxyUrl: "http://admin:••••••••@10.0.0.5:7890", searchCacheEnabled: true, contentCacheEnabled: true, searchTtl: 3600, contentTtl: 86400, cacheMaxSize: 1000, webRpm: 30, mcpRpm: 60, engineConcurrency: 3, defaultLimit: 10, homeEngines: [], homeRequestLimit: null, homeBingMode: "request", historyEnabled: true, historyRetentionDays: 30, logFullQuery: false };
+export const initialSettings: SettingsState = { proxyEnabled: true, proxyUrl: "http://admin:••••••••@10.0.0.5:7890", searchCacheEnabled: true, contentCacheEnabled: true, searchTtl: 3600, contentTtl: 86400, cacheMaxSize: 1000, webRpm: 30, mcpRpm: 60, engineConcurrency: 3, defaultLimit: 10, homeEngines: [], homeEngineOrder: ["bing", "baidu", "duckduckgo", "exa", "csdn", "juejin", "sogou"], mcpEngineOrder: ["bing", "baidu", "duckduckgo", "exa", "csdn", "juejin", "sogou"], homeRequestLimit: null, homeBingMode: "request", historyEnabled: true, historyRetentionDays: 30, logFullQuery: false };
 
 export const clientTemplates: Record<string, string> = {
   "WorkBuddy": `{
   "mcpServers": {
-    "lazycat-search": {
+    "miaomiao-search": {
       "url": "https://search.example.com/mcp",
       "headers": {
         "Authorization": "Bearer <YOUR_ACCESS_TOKEN>"
@@ -62,7 +62,7 @@ export const clientTemplates: Record<string, string> = {
   "Cherry Studio": `{
   "mcpServers": [
     {
-      "name": "lazycat-search",
+      "name": "miaomiao-search",
       "type": "streamable-http",
       "url": "https://search.example.com/mcp",
       "headers": {
@@ -71,9 +71,9 @@ export const clientTemplates: Record<string, string> = {
     }
   ]
 }`,
-  "Claude Code": `claude mcp add --transport http lazycat-search https://search.example.com/mcp --header "Authorization: Bearer <YOUR_ACCESS_TOKEN>"`,
+  "Claude Code": `claude mcp add --transport http miaomiao-search https://search.example.com/mcp --header "Authorization: Bearer <YOUR_ACCESS_TOKEN>"`,
   "Codex / Cursor": `{
-  "lazycat-search": {
+  "miaomiao-search": {
     "command": "npx",
     "args": [
       "mcp-remote",

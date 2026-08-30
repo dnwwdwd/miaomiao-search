@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>lazycat-search - 自托管多引擎联网搜索 & MCP 服务</title>
+    <title>miaomiao-search - 自托管多引擎联网搜索 & MCP 服务</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Phosphor Icons CDN -->
@@ -81,7 +81,7 @@
                 <i class="ph-fill ph-planet text-3xl"></i>
             </div>
             
-            <h2 class="text-2xl font-extrabold text-slate-900 mb-1 tracking-tight">lazycat-search</h2>
+            <h2 class="text-2xl font-extrabold text-slate-900 mb-1 tracking-tight">miaomiao-search</h2>
             <p class="text-xs text-slate-500 mb-6" data-i18n="login_subtitle">自托管多引擎联网搜索 & Remote MCP 服务 (v0.5)</p>
 
             <!-- Login Error Alert Banner -->
@@ -128,7 +128,7 @@
                     <i class="ph-fill ph-planet text-xl"></i>
                 </div>
                 <div>
-                    <span class="font-extrabold text-slate-900 tracking-tight text-sm block leading-none">lazycat-search</span>
+                    <span class="font-extrabold text-slate-900 tracking-tight text-sm block leading-none">miaomiao-search</span>
                     <span class="text-[10px] text-blue-600 font-mono font-bold">PRD v0.5 Specification</span>
                 </div>
             </div>
@@ -205,7 +205,7 @@
                     
                     <!-- Search Header & Logo -->
                     <div class="text-center py-4" id="search-hero">
-                        <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight" data-i18n="search_portal_title">lazycat-search Portal</h1>
+                        <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight" data-i18n="search_portal_title">miaomiao-search Portal</h1>
                         <p class="text-xs text-slate-500 mt-1" data-i18n="search_portal_subtitle">聚合 Bing、Baidu、DuckDuckGo 等 9 大无 Key 搜索源</p>
                     </div>
 
@@ -348,7 +348,7 @@
                         <div class="bg-slate-900 text-slate-100 p-3.5 rounded-xl font-mono text-xs border border-slate-800 flex justify-between items-center shadow-inner">
                             <div>
                                 <div class="text-slate-400 text-[10px] mb-0.5">STREAMABLE HTTP ENDPOINT</div>
-                                <code class="text-emerald-400 font-bold" id="mcp-endpoint-url">https://lazycat-search.box-id.heiyu.space/mcp</code>
+                                <code class="text-emerald-400 font-bold" id="mcp-endpoint-url">https://miaomiao-search.box-id.heiyu.space/mcp</code>
                             </div>
                             <button onclick="app.copyText('mcp-endpoint-url')" class="text-slate-400 hover:text-white"><i class="ph-bold ph-copy text-lg"></i></button>
                         </div>
@@ -830,7 +830,7 @@
                     </div>
                     <div>
                         <label class="block text-slate-700 mb-1 font-semibold" data-i18n="test_query">测试关键词 (Query)</label>
-                        <input type="text" id="test-engine-query" value="lazycat-search status check" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 font-mono">
+                        <input type="text" id="test-engine-query" value="miaomiao-search status check" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-slate-800 font-mono">
                     </div>
                 </div>
             </div>
@@ -954,7 +954,7 @@
                 usagePageSize: 5,
                 searchHistory: [
                     { query: 'Model Context Protocol Streamable HTTP', engines: ['DuckDuckGo', 'Exa'], time: '10 mins ago', count: 3 },
-                    { query: 'lazycat-search PRD v0.5', engines: ['Baidu', 'Sogou'], time: '1 hour ago', count: 2 }
+                    { query: 'miaomiao-search PRD v0.5', engines: ['Baidu', 'Sogou'], time: '1 hour ago', count: 2 }
                 ]
             },
 
@@ -991,7 +991,7 @@
                         desc: 'An in-depth overview of the Streamable HTTP transport mode in MCP. Streamable HTTP provides low-latency bidirectional communication for remote AI agents.'
                     },
                     {
-                        title: 'lazycat-search：自托管多引擎联网搜索 & Remote MCP 服务部署指南',
+                        title: 'miaomiao-search：自托管多引擎联网搜索 & Remote MCP 服务部署指南',
                         url: 'https://github.com/Aas-ee/open-webSearch',
                         domain: 'github.com',
                         engines: ['Baidu', 'Sogou'],
@@ -1026,7 +1026,7 @@
                     nav_usage: '统计审计',
                     nav_settings: '系统配置',
                     cache_hit_rate: '缓存命中率',
-                    search_portal_title: 'lazycat-search Portal',
+                    search_portal_title: 'miaomiao-search Portal',
                     search_portal_subtitle: '聚合 Bing、Baidu、DuckDuckGo 等 9 大无 Key 搜索源',
                     search_btn: '搜索',
                     url_detected_hint: '检测到输入为完整 URL，可直接读取网页正文',
@@ -1167,7 +1167,7 @@
                     nav_usage: 'Usage Audit',
                     nav_settings: 'System Settings',
                     cache_hit_rate: 'Cache Hit Rate',
-                    search_portal_title: 'lazycat-search Portal',
+                    search_portal_title: 'miaomiao-search Portal',
                     search_portal_subtitle: 'Aggregates Bing, Baidu, DuckDuckGo & 9 Keyless Search Sources',
                     search_btn: 'Search',
                     url_detected_hint: 'Full URL detected. You can read the webpage content directly.',
@@ -1308,7 +1308,7 @@
                 this.state.isLoggedIn = true;
                 document.getElementById('login-view').classList.add('hidden');
                 document.getElementById('app-shell').classList.remove('hidden');
-                this.showToast(this.lang === 'zh' ? '登录成功，进入 lazycat-search 管理平台' : 'Login successful. Welcome to lazycat-search.');
+                this.showToast(this.lang === 'zh' ? '登录成功，进入 miaomiao-search 管理平台' : 'Login successful. Welcome to miaomiao-search.');
             },
 
             simLoginError(type) {
@@ -1530,7 +1530,7 @@
                 const loading = document.getElementById('reader-loading');
                 const bodyText = document.getElementById('reader-content-text');
 
-                title.innerText = url.includes('modelcontextprotocol') ? 'Model Context Protocol Concept & Architecture' : 'lazycat-search：自托管多引擎联网搜索 & Remote MCP 服务部署指南';
+                title.innerText = url.includes('modelcontextprotocol') ? 'Model Context Protocol Concept & Architecture' : 'miaomiao-search：自托管多引擎联网搜索 & Remote MCP 服务部署指南';
                 const finalUrl = url.includes('github.com') ? `${url}/README.md` : url;
                 originalLink.innerText = url;
                 originalLink.href = url;
@@ -1547,7 +1547,7 @@
                         `URL: ${url}\n` +
                         `Extracted At: ${new Date().toISOString()}\n\n` +
                         `## Summary\n\n` +
-                        `This document is processed by lazycat-search Readability engine. All scripts, inline HTML attributes, and unsafe dynamic payloads have been sanitized according to SSRF & XSS policies.\n\n` +
+                        `This document is processed by miaomiao-search Readability engine. All scripts, inline HTML attributes, and unsafe dynamic payloads have been sanitized according to SSRF & XSS policies.\n\n` +
                         `The Model Context Protocol (MCP) defines an open standard for AI models to interact with local or remote resources through explicit tools. Streamable HTTP provides efficient streaming without legacy SSE overhead.`;
                 }, 450);
             },
@@ -1722,11 +1722,11 @@
                 if (tab === 'workbuddy') {
                     pre.innerText = JSON.stringify({
                         "mcpServers": {
-                            "lazycat-search": {
+                            "miaomiao-search": {
                                 "command": "npx",
                                 "args": ["-y", "@modelcontextprotocol/server-fetch"],
                                 "env": {
-                                    "SEARCH_ENDPOINT": "https://lazycat-search.box-id.heiyu.space/mcp",
+                                    "SEARCH_ENDPOINT": "https://miaomiao-search.box-id.heiyu.space/mcp",
                                     "AUTHORIZATION": "Bearer <YOUR_ACCESS_TOKEN>"
                                 }
                             }
@@ -1734,19 +1734,19 @@
                     }, null, 2);
                 } else if (tab === 'cherry') {
                     pre.innerText = JSON.stringify({
-                        "name": "lazycat-search",
+                        "name": "miaomiao-search",
                         "type": "streamable-http",
-                        "url": "https://lazycat-search.box-id.heiyu.space/mcp",
+                        "url": "https://miaomiao-search.box-id.heiyu.space/mcp",
                         "headers": {
                             "Authorization": "Bearer <YOUR_ACCESS_TOKEN>"
                         }
                     }, null, 2);
                 } else if (tab === 'claude') {
-                    pre.innerText = `claude mcp add lazycat-search --transport http https://lazycat-search.box-id.heiyu.space/mcp --header "Authorization: Bearer <YOUR_ACCESS_TOKEN>"`;
+                    pre.innerText = `claude mcp add miaomiao-search --transport http https://miaomiao-search.box-id.heiyu.space/mcp --header "Authorization: Bearer <YOUR_ACCESS_TOKEN>"`;
                 } else if (tab === 'codex') {
-                    pre.innerText = `[mcp.servers.lazycat-search]\nurl = "https://lazycat-search.box-id.heiyu.space/mcp"\ntransport = "streamable-http"\nheaders = { Authorization = "Bearer <YOUR_ACCESS_TOKEN>" }`;
+                    pre.innerText = `[mcp.servers.miaomiao-search]\nurl = "https://miaomiao-search.box-id.heiyu.space/mcp"\ntransport = "streamable-http"\nheaders = { Authorization = "Bearer <YOUR_ACCESS_TOKEN>" }`;
                 } else {
-                    pre.innerText = `curl -X POST https://lazycat-search.box-id.heiyu.space/mcp \\\n  -H "Authorization: Bearer <YOUR_ACCESS_TOKEN>" \\\n  -H "Content-Type: application/json" \\\n  -d '{"jsonrpc": "2.0", "method": "tools/list", "id": 1}'`;
+                    pre.innerText = `curl -X POST https://miaomiao-search.box-id.heiyu.space/mcp \\\n  -H "Authorization: Bearer <YOUR_ACCESS_TOKEN>" \\\n  -H "Content-Type: application/json" \\\n  -d '{"jsonrpc": "2.0", "method": "tools/list", "id": 1}'`;
                 }
             },
 
