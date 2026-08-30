@@ -9,6 +9,8 @@ const migrations = [
   { id: "0004_remove_brave", file: "0004_remove_brave.sql" },
   { id: "0005_purge_removed_brave_history", file: "0005_purge_removed_brave_history.sql" },
   { id: "0006_remove_legacy_admin", file: "0006_remove_legacy_admin.sql" },
+  { id: "0007_local_account", file: "0007_local_account.sql" },
+  { id: "0008_user_identity_and_token_owner", file: "0008_user_identity_and_token_owner.sql" },
 ] as const;
 
 export function migrate(sqlite: Database.Database): void {

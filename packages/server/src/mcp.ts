@@ -2,9 +2,9 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { engineIds, type EngineId } from "./domain.js";
 import { DomainError } from "./domain.js";
-import type { SearchService } from "./services/search.js";
+import type { SearchService, SiteFetchToolName } from "./services/search.js";
 import type { SettingsService } from "./services/settings.js";
-import type { TokenService, VerifiedToken } from "./services/tokens.js";
+import type { VerifiedToken } from "./services/tokens.js";
 
 export const mcpTools = [
   { id: "search", name: "search", description: "多引擎分组与聚合搜索", parameters: "query, limit?, engines, searchMode", scope: "search" as const },
@@ -17,24 +17,31 @@ export const mcpTools = [
 
 export type McpToolState = Record<(typeof mcpTools)[number]["name"], boolean>;
 
+export type McpAuthorization = {
+  token?: VerifiedToken;
+  ensureScope: (scope: "search" | "fetch") => () => void;
+};
+
 export function getMcpTools(settings: SettingsService): McpToolState {
   const defaults = Object.fromEntries(mcpTools.map((tool) => [tool.name, tool.name !== "fetchLinuxDoArticle"])) as McpToolState;
   return { ...defaults, ...(settings.get<Partial<McpToolState>>("mcp.tools") ?? {}) };
 }
 
-export function createMcpServer(dependencies: { search: SearchService; tokens: TokenService; settings: SettingsService; token: VerifiedToken }): McpServer {
-  const server = new McpServer({ name: "lazycat-search", version: "0.1.0" });
+export function createMcpServer(dependencies: { search: SearchService; settings: SettingsService; authorization: McpAuthorization; getEnabledEngines: () => EngineId[] }): McpServer {
+  const server = new McpServer({ name: "miaomiao-search", version: "0.1.0" });
   const enabled = getMcpTools(dependencies.settings);
-  const ensureScope = (scope: "search" | "fetch") => dependencies.tokens.verifyTokenContext(dependencies.token, scope, dependencies.settings.get<number>("rateLimit.mcp.rpm") ?? 60);
+  const tokenContext = { tokenId: dependencies.authorization.token?.id, tokenPrefix: dependencies.authorization.token?.prefix };
 
   if (enabled.search) {
+    const enabledEngineIds = currentEnabledEngineIds(dependencies.getEnabledEngines());
+    const engineEnum = z.enum(enabledEngineIds);
     server.registerTool("search", {
-      title: "Multi-engine search", description: "Search with the enabled public web engines.",
-      inputSchema: z.object({ query: z.string().min(1).max(500), engines: z.array(z.enum(engineIds)).min(1).max(engineIds.length).optional(), limit: z.number().int().min(1).max(50).optional(), searchMode: z.enum(["auto", "request"]).optional() }),
+      title: "Multi-engine search", description: `Search with currently enabled public web engines: ${enabledEngineIds.join(", ")}. Omit engines to use the current default set.`,
+      inputSchema: z.object({ query: z.string().min(1).max(500), engines: z.array(engineEnum).min(1).max(enabledEngineIds.length).optional(), limit: z.number().int().min(1).max(50).optional(), searchMode: z.enum(["auto", "request"]).optional() }),
     }, async ({ query, engines, limit, searchMode }) => {
-      const release = ensureScope("search");
+      const release = dependencies.authorization.ensureScope("search");
       try {
-        const result = await dependencies.search.search({ query, engines: (engines ?? []) as EngineId[], limit, searchMode }, { channel: "mcp", tokenId: dependencies.token.id, tokenPrefix: dependencies.token.prefix });
+        const result = await dependencies.search.search({ query, engines: (engines ?? []) as EngineId[], limit, searchMode }, { channel: "mcp", ...tokenContext });
         return { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result };
       } finally { release(); }
     });
@@ -45,16 +52,23 @@ export function createMcpServer(dependencies: { search: SearchService; tokens: T
       title: tool.name, description: tool.description,
       inputSchema: z.object({ url: z.string().url(), maxChars: z.number().int().min(1_000).max(200_000).optional() }),
     }, async ({ url, maxChars }) => {
-      const release = ensureScope("fetch");
+      const release = dependencies.authorization.ensureScope("fetch");
       try {
         if ("host" in tool) {
           const hostname = new URL(url).hostname.toLowerCase();
           if (hostname !== tool.host && !hostname.endsWith(`.${tool.host}`)) throw new DomainError("MCP_TOOL_URL_DENIED", `此 Tool 仅允许 ${tool.host} URL`);
         }
-        const result = await dependencies.search.fetchContent(url, maxChars ?? 50_000, { channel: "mcp", tokenId: dependencies.token.id, tokenPrefix: dependencies.token.prefix });
+        const result = tool.name === "fetchWebContent"
+          ? await dependencies.search.fetchContent(url, maxChars ?? 50_000, { channel: "mcp", ...tokenContext })
+          : await dependencies.search.fetchSiteContent(tool.name as SiteFetchToolName, url, maxChars ?? 50_000, { channel: "mcp", ...tokenContext });
         return { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result };
       } finally { release(); }
     });
   }
   return server;
+}
+
+function currentEnabledEngineIds(value: EngineId[]): [EngineId, ...EngineId[]] {
+  const enabled = [...new Set(value.filter((id): id is EngineId => engineIds.includes(id)))];
+  return (enabled.length ? enabled : [engineIds[0]]) as [EngineId, ...EngineId[]];
 }

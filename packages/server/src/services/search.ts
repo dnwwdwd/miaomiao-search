@@ -1,14 +1,15 @@
-import { DomainError, type Channel, type EngineId, type EngineSearchResultGroup, type FetchContent, type SearchFailure, type SearchInput, type SearchResponse, type SearchResult, type UpstreamSearchResponse } from "../domain.js";
+import { assertHttpUrlWithoutCredentials, DomainError, type Channel, type EngineId, type EngineSearchResultGroup, type FetchContent, type SearchFailure, type SearchInput, type SearchResponse, type SearchResult, type UpstreamSearchResponse } from "../domain.js";
 import type { OpenWebSearchClient } from "../upstream/open-websearch.js";
 import { AuditService } from "./audit.js";
 import { TtlLruCache } from "./cache.js";
-import { validatePublicHttpUrl } from "./security.js";
 import { SettingsService } from "./settings.js";
 
 const searchCacheTtlMs = 60 * 60 * 1_000;
 const contentCacheTtlMs = 24 * 60 * 60 * 1_000;
 
 type EngineLimitResolver = (engines: EngineId[]) => Partial<Record<EngineId, number | null>>;
+type EngineResolver = (engines: EngineId[], channel?: Channel) => EngineId[];
+export type SiteFetchToolName = "fetchCsdnArticle" | "fetchJuejinArticle" | "fetchGithubReadme" | "fetchLinuxDoArticle";
 
 export class SearchService {
   constructor(
@@ -17,12 +18,12 @@ export class SearchService {
     private readonly settings?: SettingsService,
     private readonly searchCache = new TtlLruCache<UpstreamSearchResponse>(1_000),
     private readonly contentCache = new TtlLruCache<FetchContent>(1_000),
-    private readonly resolveEngines: (engines: EngineId[]) => EngineId[] = (engines) => engines,
+    private readonly resolveEngines: EngineResolver = (engines) => engines,
     private readonly resolveEngineLimits: EngineLimitResolver = () => ({}),
   ) {}
 
   async search(input: SearchInput, context: { channel: Channel; saveHistory?: boolean; tokenId?: string; tokenPrefix?: string }): Promise<SearchResponse> {
-    const resolvedInput = { ...input, engines: this.resolveEngines(input.engines) };
+    const resolvedInput = { ...input, engines: this.resolveEngines(input.engines, context.channel) };
     this.validateSearchInput(resolvedInput);
     const startedAt = Date.now();
     const configuredLimits = this.resolveEngineLimits(resolvedInput.engines);
@@ -63,7 +64,8 @@ export class SearchService {
       const failures = engineResults.flatMap((group) => group.failure ? [group.failure] : []);
       if (engineResults.every((group) => group.failure && group.results.length === 0)) {
         const allTimedOut = engineResults.every((group) => group.failure?.code.includes("TIMEOUT"));
-        throw new DomainError("ALL_ENGINES_FAILED", allTimedOut ? "所有搜索引擎响应超时" : "所有搜索引擎均失败", 502);
+        const singleFailure = engineResults.length === 1 ? engineResults[0]?.failure : undefined;
+        throw new DomainError(singleFailure?.code ?? "ALL_ENGINES_FAILED", singleFailure?.message ?? (allTimedOut ? "所有搜索引擎响应超时" : "所有搜索引擎均失败"), 502);
       }
 
       const results = deduplicateResults(engineResults.flatMap((group) => group.results));
@@ -105,10 +107,12 @@ export class SearchService {
 
   async fetchContent(url: string, maxChars: number, context: { channel: Channel; tokenId?: string; tokenPrefix?: string }): Promise<{ content: FetchContent; cached: boolean; requestId: string }> {
     const configuredMaxChars = this.setting("fetch.maxChars", 50_000);
-    if (!Number.isInteger(maxChars) || maxChars < 1_000 || maxChars > Math.min(200_000, configuredMaxChars)) throw new DomainError("INVALID_MAX_CHARS", `正文长度必须在 1000 到 ${Math.min(200_000, configuredMaxChars)} 之间`);
-    await validatePublicHttpUrl(url);
+    this.assertMaxChars(maxChars, configuredMaxChars);
+    assertHttpUrlWithoutCredentials(url);
     const startedAt = Date.now();
-    const key = JSON.stringify({ url, maxChars, extractor: "readability-v2" });
+    // Bump the strategy version whenever extraction fallbacks change so stale
+    // single-strategy bodies cannot mask a newly readable page.
+    const key = JSON.stringify({ url, maxChars, extractor: "multi-strategy-v3" });
     let cached = false;
     try {
       const contentCacheEnabled = this.setting("cache.content.enabled", true);
@@ -116,7 +120,7 @@ export class SearchService {
       if (content) cached = true;
       else {
         content = await this.upstream.fetchWebContent({ url, maxChars });
-        await validatePublicHttpUrl(content.finalUrl);
+        assertHttpUrlWithoutCredentials(content.finalUrl, "最终 URL");
         if (contentCacheEnabled) this.contentCache.set(key, content, this.setting("cache.content.ttl", contentCacheTtlMs / 1_000) * 1_000);
       }
       const requestId = this.audit.record({ channel: context.channel, operation: "fetchWebContent", tokenId: context.tokenId, tokenPrefix: context.tokenPrefix, latencyMs: Date.now() - startedAt, cacheHit: cached, resultCount: 1, status: "success" });
@@ -126,6 +130,43 @@ export class SearchService {
       this.audit.record({ channel: context.channel, operation: "fetchWebContent", tokenId: context.tokenId, tokenPrefix: context.tokenPrefix, latencyMs: Date.now() - startedAt, cacheHit: cached, status: "error", errorCode: domainError.code });
       throw domainError;
     }
+  }
+
+  async fetchSiteContent(tool: SiteFetchToolName, url: string, maxChars: number, context: { channel: Channel; tokenId?: string; tokenPrefix?: string }): Promise<{ content: FetchContent; cached: boolean; requestId: string }> {
+    const configuredMaxChars = this.setting("fetch.maxChars", 50_000);
+    this.assertMaxChars(maxChars, configuredMaxChars);
+    assertHttpUrlWithoutCredentials(url);
+    const startedAt = Date.now();
+    const key = JSON.stringify({ url, maxChars, extractor: tool });
+    let cached = false;
+    try {
+      const contentCacheEnabled = this.setting("cache.content.enabled", true);
+      let content = contentCacheEnabled ? this.contentCache.get(key) : undefined;
+      if (content) cached = true;
+      else {
+        const raw = await this.fetchSpecialized(tool, url);
+        if (!raw) throw new DomainError("CONTENT_NOT_FOUND", "上游没有返回可读取的正文", 404);
+        content = { url, finalUrl: url, title: "", contentType: "text/plain", truncated: raw.length > maxChars, content: raw.slice(0, maxChars) };
+        if (contentCacheEnabled) this.contentCache.set(key, content, this.setting("cache.content.ttl", contentCacheTtlMs / 1_000) * 1_000);
+      }
+      const requestId = this.audit.record({ channel: context.channel, operation: tool, tokenId: context.tokenId, tokenPrefix: context.tokenPrefix, latencyMs: Date.now() - startedAt, cacheHit: cached, resultCount: 1, status: "success" });
+      return { content, cached, requestId };
+    } catch (error) {
+      const domainError = error instanceof DomainError ? error : new DomainError("FETCH_FAILED", "正文读取失败", 502);
+      this.audit.record({ channel: context.channel, operation: tool, tokenId: context.tokenId, tokenPrefix: context.tokenPrefix, latencyMs: Date.now() - startedAt, cacheHit: cached, status: "error", errorCode: domainError.code });
+      throw domainError;
+    }
+  }
+
+  private async fetchSpecialized(tool: SiteFetchToolName, url: string): Promise<string | null> {
+    if (tool === "fetchGithubReadme") return this.upstream.fetchGithubReadme({ url });
+    if (tool === "fetchCsdnArticle") return this.upstream.fetchCsdnArticle({ url });
+    if (tool === "fetchJuejinArticle") return this.upstream.fetchJuejinArticle({ url });
+    return this.upstream.fetchLinuxDoArticle({ url });
+  }
+
+  private assertMaxChars(maxChars: number, configuredMaxChars: number): void {
+    if (!Number.isInteger(maxChars) || maxChars < 1_000 || maxChars > Math.min(200_000, configuredMaxChars)) throw new DomainError("INVALID_MAX_CHARS", `正文长度必须在 1000 到 ${Math.min(200_000, configuredMaxChars)} 之间`);
   }
 
   private validateSearchInput(input: SearchInput): void {

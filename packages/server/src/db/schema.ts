@@ -1,5 +1,28 @@
 import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
+export const localAccounts = sqliteTable("local_account", {
+  id: text("id").primaryKey(),
+  gatewayUserId: text("gateway_user_id").notNull(),
+  ownerId: text("owner_id").notNull(),
+  account: text("account").notNull().unique(),
+  name: text("name").notNull(),
+  role: text("role", { enum: ["ADMIN", "NORMAL"] }).notNull(),
+  passwordHash: text("password_hash").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, (table) => [index("local_account_account_idx").on(table.account)]);
+
+export const tokenOwners = sqliteTable("token_owner", {
+  tokenHash: text("token_hash").primaryKey(),
+  tokenId: text("token_id").notNull().unique(),
+  gatewayUserId: text("gateway_user_id").notNull(),
+  ownerId: text("owner_id").notNull(),
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  index("token_owner_token_id_idx").on(table.tokenId),
+  index("token_owner_owner_id_idx").on(table.ownerId),
+]);
+
 export const accessTokens = sqliteTable("access_token", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),

@@ -36,6 +36,10 @@ const statusSchema = z.object({
 export interface OpenWebSearchClient {
   search(input: SearchInput): Promise<UpstreamSearchResponse>;
   fetchWebContent(input: { url: string; maxChars: number }): Promise<FetchContent>;
+  fetchGithubReadme(input: { url: string }): Promise<string | null>;
+  fetchCsdnArticle(input: { url: string }): Promise<string>;
+  fetchJuejinArticle(input: { url: string }): Promise<string>;
+  fetchLinuxDoArticle(input: { url: string }): Promise<string>;
   health(): Promise<void>;
   assertSecureRuntime(): Promise<void>;
 }
@@ -93,6 +97,9 @@ export class HttpOpenWebSearchClient implements OpenWebSearchClient {
       truncated: z.boolean().default(false),
       content: z.string(),
       readableHtml: z.string().optional(),
+      retrievalMethod: z.string().optional(),
+      extractionMethod: z.string().optional(),
+      readabilityApplied: z.boolean().optional(),
     }).transform((value) => {
       const content = readableTextFromHtml(value.readableHtml, value.content);
       return {
@@ -102,6 +109,9 @@ export class HttpOpenWebSearchClient implements OpenWebSearchClient {
         contentType: value.contentType,
         truncated: value.truncated || content.length > input.maxChars,
         content: content.slice(0, input.maxChars),
+        ...(value.retrievalMethod ? { retrievalMethod: value.retrievalMethod } : {}),
+        ...(value.extractionMethod ? { extractionMethod: value.extractionMethod } : {}),
+        ...(value.readabilityApplied !== undefined ? { readabilityApplied: value.readabilityApplied } : {}),
       };
     }).parse(await this.request("fetch-web", { ...input, renderMode: "request", readability: true }));
     } catch (error) {
@@ -110,9 +120,35 @@ export class HttpOpenWebSearchClient implements OpenWebSearchClient {
     }
   }
 
+  async fetchGithubReadme(input: { url: string }): Promise<string | null> {
+    return this.fetchSpecializedContent("fetch-github-readme", input.url, true);
+  }
+
+  async fetchCsdnArticle(input: { url: string }): Promise<string> {
+    return (await this.fetchSpecializedContent("fetch-csdn", input.url)) ?? "";
+  }
+
+  async fetchJuejinArticle(input: { url: string }): Promise<string> {
+    return (await this.fetchSpecializedContent("fetch-juejin", input.url)) ?? "";
+  }
+
+  async fetchLinuxDoArticle(input: { url: string }): Promise<string> {
+    return (await this.fetchSpecializedContent("fetch-linuxdo", input.url)) ?? "";
+  }
+
   private resultEngines(result: z.infer<typeof resultSchema>): SearchInput["engines"] {
     const candidates = result.engines ?? (result.engine ? [result.engine] : []);
     return candidates.filter((engine): engine is SearchInput["engines"][number] => engineIds.includes(engine as SearchInput["engines"][number]));
+  }
+
+  private async fetchSpecializedContent(path: string, url: string, nullable = false): Promise<string | null> {
+    try {
+      const data = z.object({ url: z.string().url(), content: nullable ? z.string().nullable() : z.string() }).parse(await this.request(path, { url }));
+      return data.content;
+    } catch (error) {
+      if (error instanceof z.ZodError) throw new DomainError("UPSTREAM_INVALID_RESPONSE", "上游服务返回格式无效", 502);
+      throw error;
+    }
   }
 
   private async request(path: string, body?: unknown, method: "GET" | "POST" = "POST"): Promise<unknown> {
@@ -125,14 +161,28 @@ export class HttpOpenWebSearchClient implements OpenWebSearchClient {
         body: body ? JSON.stringify(body) : undefined,
         signal: controller.signal,
       });
-      if (!response.ok) throw new DomainError("UPSTREAM_UNAVAILABLE", "上游服务返回异常", 502);
       const length = Number(response.headers.get("content-length") ?? 0);
       if (length > 2_000_000) throw new DomainError("UPSTREAM_RESPONSE_TOO_LARGE", "上游响应过大", 502);
-      const envelope = envelopeSchema.parse(JSON.parse(await this.readBody(response)));
-      if (envelope.status === "error") {
-        throw new DomainError(`UPSTREAM_${envelope.error?.code ?? "ERROR"}`.toUpperCase(), "上游服务失败", 502);
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(await this.readBody(response));
+      } catch {
+        throw new DomainError("UPSTREAM_INVALID_RESPONSE", "上游服务返回格式无效", 502);
       }
-      return envelope.data;
+      const envelope = envelopeSchema.safeParse(parsed);
+      if (!envelope.success) throw new DomainError("UPSTREAM_INVALID_RESPONSE", "上游服务返回格式无效", 502);
+      if (!response.ok) {
+        const code = envelope.data.error?.code?.replace(/[^a-z0-9_]+/gi, "_").toUpperCase() || "UNAVAILABLE";
+        if (code === "CONTENT_NOT_EXTRACTED" || envelope.data.error?.message === "No readable content was extracted from this URL") {
+          throw new DomainError("CONTENT_NOT_EXTRACTED", "页面已访问，但未识别到可读正文", 422);
+        }
+        throw new DomainError(`UPSTREAM_${code}`, envelope.data.error?.message || "上游服务返回异常", response.status >= 500 ? 502 : 400);
+      }
+      if (envelope.data.status === "error") {
+        const code = envelope.data.error?.code?.replace(/[^a-z0-9_]+/gi, "_").toUpperCase() || "ERROR";
+        throw new DomainError(`UPSTREAM_${code}`, envelope.data.error?.message || "上游服务失败", 502);
+      }
+      return envelope.data.data;
     } catch (error) {
       if (error instanceof DomainError) throw error;
       if (error instanceof z.ZodError) throw new DomainError("UPSTREAM_INVALID_RESPONSE", "上游服务返回格式无效", 502);
