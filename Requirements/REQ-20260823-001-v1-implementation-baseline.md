@@ -1,4 +1,4 @@
-# REQ-20260823-001：lazycat-search V1 实施基线
+# REQ-20260823-001：miaomiao-search V1 实施基线
 
 ## 分类与状态
 
@@ -17,7 +17,7 @@
 
 - 主入口：管理员登录后的 Web Search，以及外部 Agent 经 Streamable HTTP 调用的 Remote MCP。
 - 包含：Login、Search、MCP、Engines、Usage、Settings 六个页面；多引擎聚合、正文抓取、MCP Token、审计、SQLite 持久化、Docker 和懒猫微服部署。
-- 包含：把 `lazycat_search_portal.html` 的六个页面与交互还原为 Next.js 前端页面，建立可复用基础组件和各页面 mock 数据。
+- 包含：把 `miaomiao_search_portal.html` 的六个页面与交互还原为 Next.js 前端页面，建立可复用基础组件和各页面 mock 数据。
 - 当时不包含：在原型迁移阶段不创建或修改数据库 schema、迁移、真实 API、认证、MCP Endpoint 或发布产物；该限制已由后续阶段 2/3 决策解除，当前代码已实现本地服务。
 - 权限、安全与数据边界：Web 使用管理员会话；MCP 使用独立 Bearer Token；正文抓取受 SSRF 和 XSS 防护约束；Token Secret 只能展示一次且数据库只保存 Hash。
 - 兼容性与运行约束：Node.js 20+、TypeScript、pnpm、Next.js App Router、Tailwind CSS v4；主 MCP Transport 为 Streamable HTTP，Legacy SSE 默认关闭。

@@ -1,12 +1,12 @@
 ---
 id: "notus_7c82e4f0b553301e930e67c2"
 created_by: notus_agent
-title: "Lazycat Search 技术实现文档"
+title: "Miaomiao Search 技术实现文档"
 ---
 
-# Lazycat Search 技术实现文档
+# Miaomiao Search 技术实现文档
 
-> 项目名：lazycat-search　基础项目：Open-WebSearch　文档版本：v1.0　实现同步：2026-08-24
+> 项目名：miaomiao-search　基础项目：Open-WebSearch　文档版本：v1.0　实现同步：2026-08-29
 
 ## 1. 技术栈总览
 
@@ -17,25 +17,34 @@ title: "Lazycat Search 技术实现文档"
 | 后端框架 | Fastify | ≥ 5.x | 高性能、原生 TypeScript 支持、插件体系成熟、JSON Schema 校验内建 |
 | 前端框架 | Next.js（React） | ≥ 16 | 使用 App Router 管理页面与布局，为后续服务端集成保留边界 |
 | 前端构建 | Next.js / Turbopack | — | 使用 Next.js 官方开发与生产构建流程 |
+
 | UI 组件库 | 项目内基础组件 + Tailwind CSS v4 | — | Button、Input、SearchInput、Tag、Tabs、Switch、RadioGroup、Dropdown、Select、Modal、Toast 由项目源码维护，避免运行时组件依赖 |
 | 状态管理 | React Context + useState | React 内建 | Context 保存页面会话数据和短暂交互状态；引擎、历史、Token、设置和审计数据通过同源管理 API 刷新 |
 | HTTP 客户端 | 原生 fetch 封装 | 浏览器内建 | `src/lib/api.ts` 统一处理 Cookie、JSON 请求和服务端错误；仅开发环境使用 Next rewrite，LPK 由网关直接转发 `/api/` 与 `/mcp` |
-| 数据库 | SQLite | — | 单文件、零运维，适合自托管和懒猫微服 `/lzcapp/var/lazycat-search/data` 持久化 |
+| 数据库 | SQLite | — | 单文件、零运维，适合自托管和懒猫微服 `/lzcapp/var/miaomiao-search/data` 持久化 |
 | ORM | Drizzle ORM + drizzle-kit | ≥ 0.38 | 类型安全、SQL-first、SQLite 适配良好、迁移工具内建 |
 | MCP SDK | @modelcontextprotocol/sdk | ≥ 1.x | 官方 SDK，Streamable HTTP Transport 开箱可用 |
-| 认证 | 懒猫 OIDC Authorization Code + PKCE（jose） | — | 用户点击门户按钮发起授权；验证 state、nonce、PKCE 与 ID Token，不保留本地密码账户 |
+| 认证 | 懒猫 OIDC Authorization Code + PKCE（jose）+ 本地账号密码 | — | 首次 OIDC 建立本地账户；密码使用 scrypt 哈希，验证 state、nonce、PKCE 与 ID Token |
 | 日志 | pino | ≥ 9.x | Fastify 默认日志库，JSON 结构化输出 |
 | 测试 | Node.js Test Runner、Next.js 构建、TypeScript、ESLint | — | 当前已有 3 个源代码契约测试，并具备 lint、类型与生产构建命令 |
-| 容器 | 懒猫 LPK V2 | — | `web` 与 `api` 使用懒猫 Node 基础镜像；API 内运行私有 Open-WebSearch daemon |
+| 容器 | 懒猫 LPK V2 + 自定义 Docker 镜像 | — | `web` 与 `api` 复用同一 Linux amd64 运行时镜像；API 内运行 Open-WebSearch daemon，并提供 Playwright Core + Chromium 正文渲染回退 |
 | 包管理 | pnpm | ≥ 9.x | Monorepo workspace 支持、依赖安装快、磁盘占用小 |
+
+## 2026-08-29 门户交互与引擎顺序补充
+
+- SettingsService 保存 `search.homeEngineOrder` 和 `search.mcpEngineOrder` 两个 JSON 数组；旧数据缺键时按当前引擎列表推导，读取时过滤未知/重复 ID 并追加新增引擎。
+- SearchService 的引擎解析接收 `channel`，Web 与 MCP 在省略引擎时分别使用对应顺序；MCP Tool schema 同步使用 MCP 顺序，显式 `engines` 数组不重排。
+- 门户正文弹窗使用共享 Modal、骨架屏和安全文本链接渲染；`ErrorDisclosure` 只在用户展开详情时显示原始错误。正文 URL 仅渲染为 HTTP(S) 新窗口链接，不触发二次抓取。
 
 ### 1.1 当前 LPK、认证与持久化口径（2026-08-25）
 
-- 发布包为 Linux amd64 的多实例 LPK：`cloud.lazycat.app.lazycat-search`（`0.1.0`）。`web` 运行 Next standalone，`api` 运行 Fastify 及只监听 `127.0.0.1:3210` 的 Open-WebSearch daemon。
-- 根路径和 `/api/` 受懒猫网关登录保护；只有 `/mcp` 配置为 `public_path`，并且仍只接受本应用独立签发的 Bearer Token。门户 Cookie、OIDC 会话与 MCP Token 互不复用。
-- 门户不从 `X-HC-*` Header 自动登录。用户必须在登录页点击按钮，走 OIDC Authorization Code + PKCE 回调；服务端校验 state、nonce、签名、issuer、audience 与过期时间。
-- 仅 API 服务挂载 `/lzcapp/var/lazycat-search/data`，其中的新实例目录由平台以空目录提供。LPK 不携带数据库文件，应用只迁移和写入默认值；不设置首次清空或任意删除挂载数据的逻辑。
-- 每实例密钥由 `.S.DeployID` 派生，分别用于 Cookie 签名、应用会话、MCP Token HMAC 与设置加密。历史本地 `admin` 表及密码认证已由版本化迁移移除。
+- 发布包为 Linux x86-64 的单实例 LPK：`cloud.lazycat.app.miaomiao-search`（`0.1.1`）。`web` 运行 Next standalone，`api` 运行 Fastify 及只监听 `127.0.0.1:3210` 的 Open-WebSearch daemon。
+- `api` 的运行脚本先通过包内启动器以锁定的 Open-WebSearch `2.1.11` 版本启动 daemon，轮询 `/health` 就绪后再启动 Fastify；脚本默认使用 `SEARCH_MODE=request`，退出或收到终止信号时会清理两个子进程。
+- 根路径、`/api/auth/*` 和 `/mcp` 配置为应用公共路径；门户受保护 API 由应用会话校验，`/mcp` 支持外部 Bearer Token 和懒猫可信应用间委托两种入口。门户 Cookie、OIDC 会话与 MCP Token 互不复用。
+- 仅 API 服务挂载 `/lzcapp/var/miaomiao-search/data`，其中的新实例目录由平台以空目录提供。LPK 不携带数据库文件，应用只迁移和写入默认值；不设置首次清空或任意删除挂载数据的逻辑。
+- 门户不从 `X-HC-*` Header 自动创建会话。用户可在登录页选择 OIDC 或已建号的本地账号；OIDC 回调校验 state、nonce、签名、issuer、audience 与过期时间，并用 `X-HC-User-ID` 建立映射；受保护 API 会将当前 UID 与会话 UID 比较。
+- 安装级密钥由 AppDomain 派生，分别用于 Cookie 签名、应用会话、MCP Token HMAC 与设置加密。身份库保存网关 UID、OIDC sub、账号、角色和 scrypt 密码哈希；业务库按 UID 隔离，历史本地 `admin` 表已由版本化迁移移除。
+- web、Fastify API 和 Open-WebSearch daemon 由 Linux amd64 自定义镜像提供，LPK 只保留轻量说明文件；镜像先推送 Docker Hub，再复制到懒猫官方 registry。
 
 ## 2. 项目结构
 
@@ -44,7 +53,7 @@ title: "Lazycat Search 技术实现文档"
 下列目录树保留为早期架构草图，不代表当前仓库的实际文件路径。当前可运行实现以 2.2、2.3 及第 7 节 API 表为准；当前 LPK 文件位于仓库根目录的 `package.yml`、`lzc-manifest.yml`、`lzc-build.yml` 与 `lzc/`。
 
 ```
-lazycat-search/
+miaomiao-search/
 ├── packages/
 │   ├── server/                  # 后端
 │   │   ├── src/
@@ -69,7 +78,7 @@ lazycat-search/
 │   │   │   │   └── adapters/    # bing.ts, baidu.ts, duckduckgo.ts, exa.ts...
 │   │   │   ├── services/
 │   │   │   │   ├── search.ts    # 多引擎聚合搜索、去重、排序
-│   │   │   │   ├── fetch.ts     # 网页正文抓取、SSRF 防护
+│   │   │   │   ├── fetch.ts     # 网页正文抓取与 HTTP(S) 约束
 │   │   │   │   ├── cache.ts     # 搜索缓存 + 正文缓存
 │   │   │   │   ├── auth.ts      # 管理员认证 + Token 认证
 │   │   │   │   ├── rate-limit.ts # 限流
@@ -82,7 +91,6 @@ lazycat-search/
 │   │   │   │   ├── jwt.ts       # JWT 校验 hook
 │   │   │   │   └── mcp-auth.ts  # MCP Token 校验 hook
 │   │   │   └── utils/
-│   │   │       ├── ssrf.ts      # IP/DNS 黑名单检查
 │   │   │       └── id.ts        # Request ID 生成
 │   │   ├── drizzle/             # 迁移文件
 │   │   ├── tsconfig.json
@@ -131,7 +139,7 @@ lazycat-search/
 ### 2.2 当前已实现的 Next.js 门户
 
 ```
-lazycat-search/
+miaomiao-search/
 ├── app/                         # Next.js App Router 入口
 │   ├── layout.tsx               # 全局样式与 metadata
 │   ├── page.tsx                 # 门户入口
@@ -158,16 +166,16 @@ packages/server/
 ├── drizzle/0002_engine_result_limit.sql     # 引擎独立结果数量迁移
 ├── src/
 │   ├── db/                     # Drizzle schema、SQLite 连接和迁移执行器
-│   ├── services/               # 认证、Token、设置、审计、缓存、搜索和 SSRF
-│   └── upstream/               # Open-WebSearch 私有 daemon HTTP 适配器
-└── test/services.test.ts       # 领域服务与安全路径测试
+│   ├── services/               # 认证、Token、设置、审计、缓存和搜索
+│   └── upstream/               # Open-WebSearch HTTP 适配器
+└── test/services.test.ts       # 领域服务与认证、网络边界测试
 ```
 
-当前工程已实现 Fastify 管理 API、SQLite、懒猫 OIDC 门户会话、MCP Token、缓存、搜索聚合、正文 URL 校验、Open-WebSearch 适配器、远程 `/mcp`、门户真实数据接入和 LPK V2 配置。
+当前工程已实现 Fastify 管理 API、SQLite、懒猫 OIDC 门户会话、MCP Token、缓存、搜索聚合、正文 HTTP(S) URL 校验、Open-WebSearch 适配器、远程 `/mcp`、门户真实数据接入和 LPK V2 配置。
 
 ## 3. 数据库设计
 
-SQLite 数据库文件路径：`DATA_DIR/lazycat-search.db`，懒猫微服部署时 `DATA_DIR=/lzcapp/var/lazycat-search/data`。新实例挂载空目录，不携带数据库文件；迁移和默认设置只补齐缺失项，不会清理已挂载的数据。
+SQLite 数据库文件路径为身份库 `DATA_DIR/identity.sqlite` 和用户库 `DATA_DIR/users/<sha256(gateway_uid)>/miaomiao-search.db`，懒猫微服部署时 `DATA_DIR=/lzcapp/var/miaomiao-search/data`。旧 LPK 单库不迁移、不读取；新目录只执行版本化迁移和默认设置初始化。
 
 ### 3.1 表结构
 
@@ -240,8 +248,8 @@ CREATE TABLE setting (
 
 | Key | 默认值 | 说明 |
 |-----|--------|------|
-| `proxy.enabled` | `false` | 代理开关 |
-| `proxy.url` | `""` | HTTP/SOCKS5 代理地址 |
+| `proxy.enabled` | `false` | 兼容旧实例的代理状态字段；懒猫微服 TUN/VPN 运行路径不由门户控制 |
+| `proxy.url` | `""` | 兼容旧实例的加密代理地址；懒猫微服 TUN/VPN 运行路径不依赖该值 |
 | `cache.search.enabled` | `true` | 搜索缓存开关 |
 | `cache.search.ttl` | `3600` | 搜索缓存 TTL（秒） |
 | `cache.search.maxSize` | `1000` | 最大缓存条数 |
@@ -261,7 +269,7 @@ CREATE TABLE setting (
 
 ### 4.1 Fastify 插件注册顺序
 
-以下代码是早期注册顺序示意，保留用于说明依赖关系；当前可运行入口为 `packages/server/src/app.ts`，由 `buildServer()` 注册 Cookie、CORS、限流、Host/Origin 校验、健康检查、管理 API 和 Streamable HTTP `/mcp`。
+以下代码是早期注册顺序示意，保留用于说明依赖关系；当前可运行入口为 `packages/server/src/app.ts`，由 `buildServer()` 注册 Cookie、CORS、限流、健康检查、管理 API 和 Streamable HTTP `/mcp`。公网入口的 Host/Origin 边界由 Cloudflare Tunnel 或其他反向代理负责，应用不再维护 allowlist。
 
 ```typescript
 // app.ts
@@ -313,11 +321,35 @@ GET /api/auth/oidc/start（由用户点击登录按钮发起）
   → 302 到懒猫 OIDC 授权端
 GET /api/auth/oidc/callback
   → 校验 state、nonce、PKCE、ID Token 签名、issuer、audience 与 exp
-  → Set-Cookie: lazycat_search_session；HttpOnly、Secure、SameSite=Lax，24h
+  → 优先使用懒猫网关注入的 X-HC-User-ID 作为本地账号；UserInfo/ID Token 仅作兼容回退
+  → 首次回调写入 local_account；已有 OIDC 会话访问 /api/auth/me 时补建并同步 local_account
+  → Set-Cookie: miaomiao_search_session；HttpOnly、Secure、SameSite=Lax，24h
   → 302 到固定首页
 ```
 
-应用会话通过 HttpOnly Cookie 传输，前端不直接接触其值。每个受保护 `/api/*` 请求校验该会话；不会以 `X-HC-*` Header 自动创建应用登录状态。
+ 应用会话通过 HttpOnly Cookie 传输，前端不直接接触其值。每个受保护 `/api/*` 请求校验 Cookie、当前 `X-HC-User-ID` 和 owner 映射；UID 缺失或切换时清除 Cookie 并返回认证错误。
+
+```
+POST /api/auth/logout
+  → 清除 miaomiao_search_session 和 OIDC state Cookie
+  → 前端进入公开的 `/login` 路由
+GET /api/auth/logout
+  → 清除相同 Cookie
+  → 302 到 `/login`，用于兼容直接访问该接口的旧入口
+```
+
+**本地账号登录与改密：**
+
+```
+POST /api/auth/local/login
+  → 按 account 查找已由 OIDC 建立的 local_account
+  → scrypt 校验密码，建立 loginMethod=local 的应用会话
+PUT /api/auth/password
+  → OIDC 会话可直接设置；local 会话必须校验 currentPassword
+  → 更新 password_hash，旧密码立即失效
+GET /api/auth/me
+  → 返回 account、name、role 和 loginMethod
+```
 
 **MCP Token 认证：**
 
@@ -328,6 +360,20 @@ POST /mcp
   → 检查 status='active'、未过期、未超出 RPM/Daily 限额
   → 通过后进入 MCP Server 处理
 ```
+
+**懒猫应用间委托认证：**
+
+```
+POST /mcp（通过 app.<包名>.lzcx 访问）
+  Header: X-HC-SOURCE: app:<调用方包名>
+  Header: X-HC-USER-ID: <当前懒猫 UID>
+  → 仅在没有 Authorization Header 时检查这两个头
+  → 按 UID 取得独立 UserStore；X-HC-USER-TICKET 不由应用解析
+  → Tool 调用按该用户的 rateLimit.mcp.rpm 限流
+  → 审计保留 channel=mcp，token_id/token_prefix 为空
+```
+
+带有 Authorization 但 Token 无效的请求直接返回 401，不回退到委托模式。委托入口只接受 `X-HC-SOURCE=app:<包名>`，不接受 `client` 来源或缺少 UID 的请求。
 
 ### 4.3 搜索引擎适配层
 
@@ -426,29 +472,18 @@ export async function aggregateSearch(params: {
 }
 ```
 
-### 4.5 正文抓取与 SSRF 防护
+### 4.5 正文抓取与网络边界
 
 ```typescript
-// services/fetch.ts
+// services/search.ts
 export async function fetchWebContent(url: string, maxChars: number): Promise<FetchResult> {
-  // 1. URL 合法性检查 — 仅允许 http/https
-  assertValidScheme(url);
+  // 1. 保留 URL 解析与 HTTP(S) 协议检查；不解析 DNS，也不拦截私网/回环目标
+  assertHttpUrlWithoutCredentials(url);
 
-  // 2. DNS 解析 + IP 黑名单检查
-  const resolved = await dns.resolve(new URL(url).hostname);
-  assertNotPrivateIP(resolved);
+  // 2. 由 Open-WebSearch 发起请求并按其运行时设置处理重定向
+  const response = await openWebSearch.fetchWebContent({ url, maxChars });
 
-  // 3. 发起请求，跟踪重定向
-  const response = await fetchWithRedirectCheck(url, {
-    maxRedirects: 5,
-    onRedirect: (redirectUrl) => {
-      // 每次重定向重新检查 DNS + IP
-      const rResolved = await dns.resolve(new URL(redirectUrl).hostname);
-      assertNotPrivateIP(rResolved);
-    },
-  });
-
-  // 4. 正文提取（从 Open-WebSearch 复用 readability / cheerio 逻辑）
+  // 3. 限制响应体和正文长度，并安全转换为纯文本
   const content = extractContent(response.body, maxChars);
 
   return {
@@ -462,13 +497,11 @@ export async function fetchWebContent(url: string, maxChars: number): Promise<Fe
 }
 ```
 
-**IP 黑名单列表** (`utils/ssrf.ts`)：
+当前正文网络边界由部署环境决定：可访问应用运行环境的任意 HTTP(S) 主机，包括私网、回环、链路本地、metadata 以及解析到这些地址的域名。应用仍拒绝无效 URL、非 HTTP(S) Scheme、带凭据 URL，并保留上游超时、响应体大小、正文最大长度、认证、限流和审计。站点专用 MCP Tool 仍只接受其产品定义的站点域名。
 
-- `127.0.0.0/8`、`10.0.0.0/8`、`172.16.0.0/12`、`192.168.0.0/16`
-- `169.254.0.0/16`（link-local）
-- `0.0.0.0/8`
-- IPv6：`::1`、`fc00::/7`（ULA）、`fe80::/10`（link-local）、`::ffff:0:0/96`（IPv4-mapped）
-- 云 metadata：`169.254.169.254`
+Open-WebSearch 的通用正文读取采用多策略回退：先读取 Markdown/纯文本或 HTML 语义容器，再检查 `articleBody`、`data-article-body`、JSON-LD、`__NEXT_DATA__` 等结构化字段；HTML 页面同时尝试 Mozilla Readability，遇到空壳 SPA 或挑战页时再使用带 Playwright Core + Chromium 的浏览器 HTML 渲染与浏览器 Cookie。浏览器回退会等待页面脚本完成并读取最终 DOM；结构化解析路径仍只把脚本当作文本，不执行其中的代码，也不自动抓取提取出的链接。每次响应保留 `retrievalMethod`、`extractionMethod` 和 `readabilityApplied` 元数据。
+
+当页面请求完成但所有候选都没有正文时，daemon 返回 422 `content_not_extracted`，Fastify 映射为 `CONTENT_NOT_EXTRACTED`；这个状态与参数错误、超时、TLS 和响应过大错误分开处理，Web 与 MCP 共享同一 `SearchService.fetchContent` 路径。
 
 ### 4.6 缓存实现
 
@@ -493,7 +526,7 @@ const contentCache = new LRUCache<string, CachedContent>({
 
 缓存 Key 生成策略：
 - 搜索：每个引擎独立使用 `SHA-256(query + engine + effectiveLimit + searchMode)`；配置数量变化自然切换缓存键
-- 正文：`SHA-256(url)`
+- 正文：`JSON.stringify({ url, maxChars, extractor: "multi-strategy-v3" })`；提取策略升级时通过版本字段主动避开旧正文结果
 
 Web 和 MCP 共用同一缓存实例。
 
@@ -548,7 +581,7 @@ export function getLogs(params: { page, pageSize, channel?, operation?, tokenId?
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 const mcpServer = new McpServer({
-  name: 'lazycat-search',
+  name: 'miaomiao-search',
   version: '1.0.0',
 });
 
@@ -638,7 +671,7 @@ PortalShell     -> Search / MCP / Engines / Usage / Settings 页面 JSX
 
 | 页面 | 关键组件 | 数据来源 |
 |------|---------|---------|
-| Login | `LoginScreen`, `ErrorAlert` | `GET /api/auth/oidc/start`、`GET /api/auth/oidc/callback` |
+| Login | `LoginScreen`, `ErrorAlert` | `GET /api/auth/oidc/start`、`GET /api/auth/oidc/callback`、`POST /api/auth/local/login` |
 | Search | `SearchInput`, `EngineSelector`, `LimitSelect`, `AdvancedOptions`, `ResultList`, `ResultCard`, `FailureBanner`, `ReadingPanel`, `HistoryDrawer` | `POST /api/search`, `POST /api/fetch-content` |
 | MCP | `ServiceStatus`, `ToolList`, `TokenTable`, `CreateTokenDialog`, `ConfigTemplate`, `ConnectionTest` | `GET /api/mcp`, `/api/tokens` |
 | Engines | `EngineTable`, `StatusBadge`, `TestDialog` | `GET /api/engines`, `POST /api/engines/:id/test` |
@@ -668,8 +701,10 @@ PortalShell     -> Search / MCP / Engines / Usage / Settings 页面 JSX
 |--------|------|------|------|
 | GET | `/api/auth/oidc/start` | 网关登录 | 用户点击后发起 OIDC 授权码登录 |
 | GET | `/api/auth/oidc/callback` | 网关登录 | 校验回调并建立应用会话 |
-| POST | `/api/auth/logout` | — | 登出（清除 Cookie） |
-| GET | `/api/auth/me` | 应用会话 Cookie | 返回当前 OIDC 用户 |
+| POST | `/api/auth/local/login` | — | 使用 OIDC 已建立的账号和本地密码登录 |
+| PUT | `/api/auth/password` | 应用会话 Cookie | 修改当前账号密码 |
+| GET/POST | `/api/auth/logout` | — | 清除应用会话；前端 POST 后进入 `/login`，GET 直接 302 到 `/login` |
+| GET | `/api/auth/me` | 应用会话 Cookie | 返回当前账户和登录方式 |
 
 ### 7.2 搜索
 
@@ -758,7 +793,7 @@ PortalShell     -> Search / MCP / Engines / Usage / Settings 页面 JSX
 
 | Method | Path | Auth | 说明 |
 |--------|------|------|------|
-| POST | `/mcp` | Bearer Token | Streamable HTTP MCP Endpoint |
+| POST | `/mcp` | Bearer Token 或可信懒猫应用间头 | Streamable HTTP MCP Endpoint；委托请求需 `X-HC-SOURCE=app:<包名>` 与 `X-HC-USER-ID` |
 | GET/DELETE | `/mcp` | — | 当前实现拒绝非 POST MCP 请求；Legacy SSE 仅保留为后续兼容范围 |
 
 ## 8. 历史部署草图（已被 LPK V2 方案取代）
@@ -801,7 +836,7 @@ CMD ["/app/run.sh"]
 set -e
 
 # 首次启动初始化
-if [ ! -f "$DATA_DIR/lazycat-search.db" ]; then
+if [ ! -f "$DATA_DIR/identity.sqlite" ]; then
   echo "Initializing database..."
 fi
 
@@ -820,8 +855,8 @@ exec node dist/index.js
 package:
   id: cloud.lazycat.app.open-websearch
   name:
-    zh-CN: 懒猫搜索
-    en-US: Lazycat Search
+    zh-CN: 喵喵搜索
+    en-US: Miaomiao Search
   version: "1.0.0"
   author: Aas-ee
   description:
@@ -837,7 +872,7 @@ package:
 version: "1"
 services:
   web:
-    image: lazycat-search:latest
+    image: miaomiao-search:latest
     volumes:
       - /lzcapp/var/data:/data
       - /lzcapp/cache:/cache
@@ -872,6 +907,16 @@ builds:
     dockerfile: docker/Dockerfile
 ```
 
+当前 LPK V2 还会导出 Resource MCP provider：
+
+```yaml
+resource_exports:
+  - kind: mcp-providers
+    source: ./resources/mcp-providers
+```
+
+provider 文件位于 `resources/mcp-providers/miaomiao-search/mcp.yml`，内容为 `endpoint: /mcp`。安装到 `lzcos >= v1.5.2` 后，系统会将它暴露给小龙猫、Codex 等 Agent。Agent 通过 `app.cloud.lazycat.app.miaomiao-search.lzcx/mcp` 访问时，ingress 消费用户票据并注入委托身份头。
+
 ### 8.3 环境变量
 
 | 变量 | 默认值 | 说明 |
@@ -883,7 +928,7 @@ builds:
 | `JWT_SECRET` | — | JWT 签名密钥；生产环境必填，不写入数据库。 |
 | `TOKEN_HASH_KEY` | — | Access Token HMAC 密钥；生产环境必填，独立于 JWT 密钥。 |
 | `SETTINGS_ENCRYPTION_KEY` | — | 32 字节 Base64 密钥，用于加密持久化的代理 URL；生产环境必填。 |
-| `OPEN_WEBSEARCH_URL` | `http://127.0.0.1:3210` | 私有 Open-WebSearch daemon 地址，只允许本机或 Docker 内部服务名。 |
+| `OPEN_WEBSEARCH_URL` | `http://127.0.0.1:3210` | Open-WebSearch daemon 的 HTTP(S) 地址；不限制主机是否为本机、私网或公网。 |
 | `OPEN_WEBSEARCH_VERSION` | `2.1.11` | 服务启动时校验的上游 daemon 版本。 |
 | `NODE_ENV` | `development` | 生产环境设为 `production` |
 
@@ -892,17 +937,17 @@ builds:
 | 上游模块 | 复用方式 | 改造点 |
 |---------|---------|-------|
 | 搜索引擎适配器（Bing、Baidu、DDG 等） | 抽取并重构为 `SearchEngine` 子类 | 统一接口、统一错误处理、注入代理配置 |
-| 网页正文抓取（readability + cheerio） | 抽取为 `fetchService` | 增加 SSRF 防护层、重定向检查 |
-| MCP Tool 定义（search、fetchWebContent 等） | 复用 Tool Schema 和语义 | 从 stdio transport 改为 Streamable HTTP；增加认证层 |
+| 网页正文抓取（readability + cheerio） | 抽取为 `fetchService` | 保留 HTTP(S)、响应体和正文长度约束；DNS/私网/重定向 SSRF 过滤按 Cloudflare Tunnel 部署决策移除 |
+| MCP Tool 定义（search、fetchWebContent 等） | 复用 Tool Schema 和语义 | 从 stdio transport 改为 Streamable HTTP；支持 Bearer Token 与懒猫委托认证 |
 
 ## 10. 版本规划
 
 ### V1 — 核心功能
 
 - 6 个页面完整实现（Login + Search + MCP + Engines + Usage + Settings）
-- Streamable HTTP MCP + Access Token 认证
+- Streamable HTTP MCP + Access Token 与懒猫应用间委托认证
 - 多引擎聚合搜索 + URL 去重 + 正文抓取
-- SSRF 防护
+- HTTP(S) 正文抓取约束（协议、超时、响应体与正文长度）
 - SQLite 持久化
 - Docker 镜像 + 懒猫微服 LPK
 - 管理员单账户

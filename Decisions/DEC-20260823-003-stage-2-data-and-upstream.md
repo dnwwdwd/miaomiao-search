@@ -48,7 +48,7 @@ Open-WebSearch 当前公开了本地 daemon HTTP API，适合长期进程调用�
 
 ## 拟议数据模型（待确认）
 
-数据库为单个 SQLite 文件：`DATA_DIR/lazycat-search.db`。首次迁移已创建下列六张表；项目使用 Drizzle schema 定义及版本化 SQL 迁移，由受测迁移执行器在启动时应用。
+数据库单文件方案是历史阶段基线，已由 DEC-20260826-001 替代。当前使用 `DATA_DIR/identity.sqlite` 与 `DATA_DIR/users/<sha256(gateway_uid)>/miaomiao-search.db`，分别承载身份索引和用户业务数据。
 
 | 表 | 作用 | 关键约束与保留规则 |
 |---|---|---|
@@ -61,11 +61,11 @@ Open-WebSearch 当前公开了本地 daemon HTTP API，适合长期进程调用�
 
 `request_log.token_id` 不设置外键，以保留已删除或已撤销 Token 的审计记录；同时记录不可逆的 `token_prefix`，便于管理员追溯。表中时间统一使用 UTC ISO-8601 文本。为以下查询创建索引：`access_token(hash)`、`search_history(created_at)`、`request_log(created_at)`、`request_log(channel, created_at)`、`request_log(token_id, created_at)`。
 
-本段历史密钥方案已由 `DEC-20260825-006` 取代：不再使用 `JWT_SECRET`、`TOKEN_HASH_KEY` 或 `SETTINGS_ENCRYPTION_KEY` 外部环境变量。当前由每实例 `.S.DeployID` 派生 Cookie 签名、应用会话、MCP Token HMAC 与设置加密密钥；这些密钥均不会写入数据库、日志或 HTTP 响应。
+本段历史密钥方案已由 DEC-20260826-001 取代：不再使用 `JWT_SECRET`、`TOKEN_HASH_KEY` 或 `SETTINGS_ENCRYPTION_KEY` 外部环境变量。当前由 AppDomain 派生安装级 Cookie 签名、应用会话、MCP Token HMAC 与设置加密密钥；这些密钥均不会写入数据库、日志或 HTTP 响应。
 
 ## 拟议迁移与恢复（待确认）
 
-1. 备份已有 `DATA_DIR/lazycat-search.db`（若存在）。
+1. 历史阶段曾备份 `DATA_DIR/miaomiao-search.db`；当前单实例方案不读取旧 LPK 单库，新的身份库和用户库在独立路径执行迁移。
 2. 执行 `0000_initial.sql`，只创建上述表和索引；不删除或修改已有数据。
 3. 在空库中写入管理员和引擎默认值；管理员密码只来自启动环境变量，默认引擎为 `bing` 与 `duckduckgo`，Bing 为 `request`。
 4. 迁移失败时停止启动，保留原数据库和迁移日志；恢复方式是替换为迁移前备份并修复迁移文件。

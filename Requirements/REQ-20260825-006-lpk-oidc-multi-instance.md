@@ -1,22 +1,24 @@
-# REQ-20260825-006：LPK 多实例与懒猫 OIDC 登录
+# REQ-20260825-006：LPK、OIDC 与数据库挂载基线（历史）
 
 ## 状态
 
-进行中。用户于 2026-08-25 确认以 LPK V2 打包 Linux amd64 应用、移除本地密码认证，并要求 `/mcp` 由网关放行但保持应用 Token 鉴权。
+本需求的多实例部分已由 REQ-20260826-001 替代。
+
+进行中。用户于 2026-08-25 确认以 LPK V2 打包 Linux amd64 应用；本地账号认证边界已由 `REQ-20260825-014` 补充。
 
 ## 范围与数据
 
 - 新增 LPK V2 元数据、清单、构建和运行脚本；运行时包含 Next.js `web`、Fastify `api` 和 API 容器内私有 Open-WebSearch daemon。
-- 每个多实例只将 `DATA_DIR=/lzcapp/var/lazycat-search/data` 挂载给 API。新实例挂载空目录；包内不包含数据库、缓存、Token、日志或密钥。
++ 单实例只将 `DATA_DIR=/lzcapp/var/miaomiao-search/data` 挂载给 API；包内不包含数据库、缓存、Token、日志或密钥。用户数据隔离由 REQ-20260826-001 定义。
 - SQLite 的写入方为迁移、默认初始化、引擎、设置、历史、审计和 MCP Token 服务；门户和 MCP 为读取方。应用不会清理、重置或迁移外部挂载目录以外的数据。
-- 历史本地 `admin` 表通过版本化迁移删除；其余已挂载数据库数据不因升级被主动删除。
+- 历史本地 `admin` 表通过版本化迁移删除，`local_account` 由首次 OIDC 登录建立；其余已挂载数据库数据不因升级被主动删除。
 
 ## 认证与安全边界
 
-- 网关默认保护门户与 `/api/*`；登录页按钮显式进入 OIDC Authorization Code + PKCE 回调，服务不以 `X-HC-*` 头自动建立登录会话。
+- 网关放行门户根路径和 `/api/auth/*`；登录页提供 OIDC 与本地账号入口，OIDC 仍使用 Authorization Code + PKCE，服务不以 `X-HC-*` 头自动建立登录会话。
 - OIDC state、nonce、PKCE、issuer、audience、ID Token 签名和过期时间必须校验；会话 Cookie 为 HttpOnly、Secure、SameSite=Lax。
-- `/mcp` 是唯一 `public_path`，只接受独立 Bearer Token 的 Hash、Scope、状态和额度校验；不绑定或读取 OIDC 身份。
-- `.S.DeployID` 派生每实例密钥，分别用于门户会话、MCP Token Hash 和加密设置；真实密钥不写入包、数据库或日志。
+- `/mcp` 继续接受独立 Bearer Token 的 Hash、Scope、状态和额度校验；不绑定或读取 OIDC/本地门户身份。
++ 安装级 stable_secret 派生门户会话、MCP Token Hash 和加密设置密钥；真实密钥不写入包、数据库或日志。
 
 ## 失败与验收
 

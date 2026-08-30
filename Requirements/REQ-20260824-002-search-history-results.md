@@ -8,7 +8,7 @@
 
 - 持久化搜索结果快照与失败引擎信息。
 - 历史弹窗展示记录摘要、引擎选择、结果快照，并支持再次搜索。
-- 按 `lazycat_search_portal.html` 的已有视觉语言优化 Next.js 首页布局，不改变搜索 API、SSRF 防护或引擎运行模型。
+- 按 `miaomiao_search_portal.html` 的已有视觉语言优化 Next.js 首页布局，不改变搜索 API、SSRF 防护或引擎运行模型。
 
 ## 数据流
 

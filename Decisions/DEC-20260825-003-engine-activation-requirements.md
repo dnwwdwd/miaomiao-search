@@ -4,6 +4,8 @@
 
 待用户确认。
 
+注：本记录中关于 DuckDuckGo 代理地址和 `proxy.enabled` 的启用校验已由 `DEC-20260825-011` 取代；当前仅 Exa API Key 仍由服务端作为启用前置条件校验。
+
 ## 背景
 
 用户要求移除 Brave，并在启用需要代理或 API Key 的搜索引擎时先检查配置；API Key 通过引擎管理页弹窗配置。当前 Exa 的补丁只从独立 Open-WebSearch daemon 的 `EXA_API_KEY` 环境变量读取密钥，门户与 daemon 是两个进程；现有 SQLite `setting` 表支持加密敏感配置，但没有引擎凭据字段或启用前置检查。

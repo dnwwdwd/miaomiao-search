@@ -1,6 +1,6 @@
-# Lazycat Search PRD
+# Miaomiao Search PRD
 
-> 项目名：lazycat-search 基础项目：Open-WebSearch 文档版本：v0.5；实现同步：2026-08-24
+> 项目名：miaomiao-search 基础项目：Open-WebSearch 文档版本：v0.5；实现同步：2026-08-24
 
 ## 1. 项目背景
 
@@ -8,12 +8,12 @@ Open-WebSearch 已具备多搜索引擎联网搜索、网页正文抓取、MCP S
 
 当前上游支持 Bing、Baidu、DuckDuckGo、Exa、CSDN、掘金、搜狗等搜索源；MCP 侧暴露 `search`、`fetchWebContent`、`fetchCsdnArticle`、`fetchJuejinArticle`、`fetchGithubReadme`、`fetchLinuxDoArticle` 等工具。
 
-lazycat-search 在 Open-WebSearch 基础上增加 Web 产品层和远程 MCP 服务层，形成一个既能由人直接使用，也能供外部 Agent 调用的自托管联网搜索服务。
+miaomiao-search 在 Open-WebSearch 基础上增加 Web 产品层和远程 MCP 服务层，形成一个既能由人直接使用，也能供外部 Agent 调用的自托管联网搜索服务。
 
 ### 设计前提
 
 - Self-hosted / 团队内部部署，目标平台为懒猫微服，同时保留通用 Docker 部署。
-- V1 单管理员账户；Web 页面需要登录；MCP 通过独立 Access Token 调用；界面提供中文和英文切换。
+- Web 页面需要登录；每个懒猫 OIDC 账户在自己的实例中拥有本地登录凭据；MCP 通过独立 Access Token 调用；界面提供中文和英文切换。
 - 搜索功能本身不接 LLM，使用 Open-WebSearch 的无 Key 搜索 Provider；V1 的 Bing 搜索只使用 HTTP request 模式。
 - MCP 以 Streamable HTTP 为主要 Transport；SSE 保留旧客户端兼容，默认关闭。
 
@@ -26,16 +26,18 @@ lazycat-search 在 Open-WebSearch 基础上增加 Web 产品层和远程 MCP 服
 
 ## 3. 页面与组件
 
-V1 共 6 个页面：Login + 5 个功能页面。管理员登录后可访问全部功能页面。
+V1 共 6 个页面：Login + 5 个功能页面。登录账户按现有角色访问功能页面。
 
 ### 3.1 Login
 
-管理员登录。
+门户登录。
 
 | 组件 | 说明 |
 | --- | --- |
-| 登录表单 | 用户名 + 密码，Enter 提交 |
-| 错误提示 | 展示服务端返回的登录错误；页面不提供错误场景模拟控件 |
+| 登录方式 | 分段切换“懒猫 OIDC”和“本地账号” |
+| 懒猫 OIDC | 用户点击后进入授权码登录；首次成功会创建本地账号 |
+| 本地账号 | 使用 OIDC 建立的懒猫账号和本地密码；未完成首次 OIDC 时不可用 |
+| 错误提示 | 展示通用授权或账号密码错误；页面不提供错误场景模拟控件 |
 
 ### 3.2 Search
 
@@ -44,14 +46,16 @@ V1 共 6 个页面：Login + 5 个功能页面。管理员登录后可访问全�
 | 组件 | 说明 |
 | --- | --- |
 | 搜索输入框 | 文本输入；Enter 提交；空输入禁止提交；搜索中禁止重复提交；输入为完整 URL 时提示"读取正文" |
-| 引擎选择器 | 多选；可选：Bing、Baidu、DuckDuckGo、Exa、CSDN、Juejin、Sogou；已禁用引擎不可选；记住浏览器最近选择；支持"一键恢复默认"。需要代理或 API Key 的引擎在启用前由服务端校验。Linux.do 上游标记暂不可用，默认不展示 |
+| 引擎选择器 | 多选；可选：Bing、Baidu、DuckDuckGo、Exa、CSDN、Juejin、Sogou；已禁用引擎不可选；记住浏览器最近选择；支持"一键恢复默认"。DuckDuckGo 启用时提示确认 TUN/VPN 代理；Exa 的 API Key 由服务端校验。Linux.do 上游标记暂不可用，默认不展示 |
 | 搜索数量选择 | 首页默认使用引擎默认值；5 / 10 / 20 / 30 / 50 仅作为本次请求临时上限且不写回配置。每个引擎受自身 `result_limit` 约束，未配置时使用搜索默认值 10 |
 | 高级选项折叠区 | Bing Search Mode（Auto / Request），仅选中 Bing 时显示，默认使用系统配置 |
 | 搜索结果列表 | 默认展示按引擎分组的结果和每组状态；可切换聚合视图。聚合视图按 canonical URL 去重并合并来源显示（如 `Bing · DuckDuckGo`）；两种视图均支持打开原网页、读取正文 |
 | 部分失败横幅 | 多引擎搜索允许部分成功；显示失败引擎及原因；单引擎失败不导致整体失败 |
 | 空结果 / 错误状态 | 区分：搜索成功但无结果、所有搜索源均失败、网络超时、被搜索引擎限制、代理异常、搜索运行时启动失败 |
-| 正文阅读面板 | 点击"读取正文"展开；显示：标题、原始 URL、最终跳转 URL、Content-Type、是否截断、正文内容；操作：复制正文、打开源站。正文最大字符数由服务端设置。失败时区分：URL 不允许访问、DNS 解析到私网、重定向被阻止、TLS 错误、无法提取正文、超时、站点拒绝 |
+| 正文阅读面板 | 点击"读取正文"展开；显示：标题、原始 URL、最终跳转 URL、Content-Type、是否截断、正文内容；操作：复制正文、打开源站。正文最大字符数由服务端设置。失败时区分：URL/协议无效、带凭据 URL、TLS 错误、无法提取正文、超时、响应过大、站点拒绝 |
 | 搜索历史 | 保存 Query、所选搜索引擎、时间、结果数量和当次结果快照；详情可查看旧结果并再次搜索获取最新结果；默认不保存网页正文 |
+
+正文阅读器在抓取期间显示骨架屏，正文链接可在新窗口打开；网页读取失败在 Web 门户中按界面语言展示友好摘要，查看详情后才显示原始错误，MCP 错误返回保持原样。
 
 ### 3.3 MCP
 
@@ -72,7 +76,7 @@ MCP 服务管理和外部 Agent 接入。
 
 | 组件 | 说明 |
 | --- | --- |
-| 引擎列表 | 每行：名称、Enabled 开关、是否默认、Search Mode、最近测试时间、状态徽标、延迟、最近错误 |
+| 引擎列表 | 每行：名称、Enabled 开关、是否默认、Search Mode、最近测试时间、状态徽标、延迟、最近错误；支持分别调整首页和 MCP 默认搜索顺序并持久化 |
 | 状态枚举 | Healthy / Degraded / Rate Limited / Blocked / Unavailable / Disabled / Unknown |
 | 测试搜索 | 固定或自定义关键词；测试不进入搜索历史，计入运行指标 |
 
@@ -94,18 +98,19 @@ MCP 服务管理和外部 Agent 接入。
 
 | 组件 | 说明 |
 | --- | --- |
-| 代理设置 | 启用开关、Proxy URL、连接测试；含密码时页面只显示脱敏值 |
+| 代理设置 | 启用开关；懒猫微服 TUN/VPN 自动接管应用流量，不要求填写 Proxy URL |
 | 缓存设置 | 搜索缓存：启用开关、TTL、最大缓存数量（每引擎 Key 包含 query + engine + effectiveLimit + searchMode）；正文缓存：独立开关和 TTL。MCP 与 Web 共用缓存 |
 | 限流设置 | Web 按 IP、MCP 按 Access Token、每引擎独立并发和速率；达到限制后返回明确错误 |
 | 搜索参数 | 默认引擎、默认结果数量 |
 | 数据管理 | 搜索历史：开关、清空、保留天数；`-1` 表示永久保存；MCP Query 日志开关 |
+| 账户与密码 | 显示账号、角色和本次登录方式；OIDC 会话可直接设置密码，本地会话需要验证当前密码 |
 
 ## 4. 全局布局
 
 | 组件 | 说明 |
 | --- | --- |
 | 侧边导航栏 | Search、MCP、Engines、Usage、Settings 五个一级入口；当前页面高亮 |
-| 顶栏 | 应用名“懒猫搜索 / Lazycat Search”、服务状态 Tag、中文/英文切换、登出；不展示项目版本说明或管理员标签 |
+| 顶栏 | 应用名“喵喵搜索 / Miaomiao Search”、服务状态 Tag、中文/英文切换、登出；不展示项目版本说明或管理员标签 |
 
 ## 5. MCP 协议
 
@@ -148,15 +153,15 @@ Token 列表显示：名称、Prefix、Scope、创建时间、过期时间、最
 
 ### 6.1 MCP 安全
 
-- `/mcp` 默认要求认证；校验 Origin；CORS 不默认 `*`。
+- `/mcp` 默认要求认证；公网 Host/Origin 由 Cloudflare Tunnel 或其他反向代理负责，应用不维护入口 allowlist。
 - Token 仅通过 Authorization Header 传输。
 - 生产环境必须 HTTPS。
 
-### 6.2 SSRF 防护
+### 6.2 正文网络边界
 
-`fetchWebContent` 必须拦截：localhost、127.0.0.0/8、RFC1918 私网、link-local、云主机 metadata、IPv6 loopback / ULA / IPv4-mapped、非 HTTP(S) Scheme。
+按 Cloudflare Tunnel 部署决策，`fetchWebContent` 不再执行 DNS、私网/回环/链路本地/metadata IP 或逐跳重定向 SSRF 检查。正文目标可以是应用运行环境可达的任意 HTTP(S) 地址。
 
-DNS 解析后再次检查目标 IP；每次 Redirect 后重新检查。
+服务端仍拒绝无效 URL、非 HTTP(S) Scheme 和带凭据 URL，并保留上游 TLS 校验、请求超时、响应体大小、正文最大字符数、认证、限流、审计和 XSS 安全转换。站点专用 MCP Tool 继续校验其产品定义的功能域名。
 
 ### 6.3 XSS
 

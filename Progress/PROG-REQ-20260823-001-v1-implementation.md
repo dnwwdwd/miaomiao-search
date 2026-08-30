@@ -1,4 +1,4 @@
-# lazycat-search V1 实施进度
+# miaomiao-search V1 实施进度
 
 > 关联需求：`REQ-20260823-001`
 > 状态：进行中
@@ -59,7 +59,7 @@
 
 - 完成：建立 `packages/server` workspace、六表 SQLite 迁移与 Drizzle schema；实现管理员 bcrypt/JWT、独立 Token HMAC、AES-256-GCM 代理设置、Token 额度、审计、历史、TTL/LRU 缓存、聚合搜索、正文 URL 校验和 Open-WebSearch daemon 适配器。
 - 安全边界：服务只接受私有 daemon 地址，固定 `open-websearch@2.1.11`；启动时检查上游版本、request 模式与 TLS 校验。正文输入拒绝本地、私网和非 HTTP(S) URL，服务端限制上游响应体大小。
-- 验证证据：新增 9 项服务端测试；`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm --filter @lazycat-search/server build`、`pnpm build` 以及项目检查脚本均通过。
+- 验证证据：新增 9 项服务端测试；`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm --filter @miaomiao-search/server build`、`pnpm build` 以及项目检查脚本均通过。
 - 待实机回归：真实 daemon 对 DNS 重绑定与跳转的逐跳验证、各搜索引擎、网页抓取和私有网络部署将在阶段 4 验证。
 
 ### 2026-08-23 — 阶段 3 实施
@@ -71,7 +71,7 @@
 
 ### 2026-08-23 — 门户原型视觉还原修正
 
-- 完成：以 `lazycat_search_portal.html` 为参照，恢复登录页、顶栏、固定侧栏和 Search、MCP、Engines、Usage、Settings 五页的卡片、表格、弹窗与信息层级；页面保留阶段 3 已接入的真实 API。
+- 完成：以 `miaomiao_search_portal.html` 为参照，恢复登录页、顶栏、固定侧栏和 Search、MCP、Engines、Usage、Settings 五页的卡片、表格、弹窗与信息层级；页面保留阶段 3 已接入的真实 API。
 - 事实边界：原型中的登录、搜索和正文状态选择器仅作为明确标注的页面预览，不改变服务端数据；搜索、历史、Token、Tool、引擎测试、审计和设置仍显示实际服务数据。Bing 的 Auto 选项仅为原型界面兼容，服务端请求仍使用 Request 模式。
 - 验证证据：`pnpm lint`、`pnpm test`、`pnpm typecheck`、`pnpm build` 通过；本地服务仍可访问 `:3000`、`:3001` 与 `:3210`。
 

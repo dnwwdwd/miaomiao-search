@@ -3,7 +3,7 @@ id: "notus_8255540ce95520a795c0406c"
 created_by: notus_agent
 ---
 
-# lazycat-search 协作规范
+# miaomiao-search 协作规范
 
 本文件规定本仓库内的协作、变更和交付规则。产品、技术、UI、流程和进度事实以 `DOCUMENT_MAP.md` 指向的文档为准；本文件只说明工作方式和阅读入口，不重复记录实现细节。
 
@@ -20,7 +20,7 @@ created_by: notus_agent
 
 | 服务 | 默认地址 | 启动命令 |
 |---|---|---|
-| Open-WebSearch daemon | `http://127.0.0.1:3210` | `pnpm --filter @lazycat-search/server exec open-websearch serve --port 3210` |
+| Open-WebSearch daemon | `http://127.0.0.1:3210` | `pnpm --filter @miaomiao-search/server exec open-websearch serve --port 3210` |
 | Fastify API / MCP | `http://127.0.0.1:3001` | `pnpm server:dev` |
 | Next.js 门户 | `http://127.0.0.1:3000` | `pnpm dev` |
 
@@ -34,7 +34,7 @@ $env:SEARCH_MODE = "request"
 # $env:PROXY_URL = "http://127.0.0.1:7890"
 # Exa 官方 Search API 需要密钥；如启用，只在当前终端设置，不要写入仓库
 # $env:EXA_API_KEY = "请替换为 Exa API Key"
-pnpm --filter @lazycat-search/server exec open-websearch serve --port 3210
+pnpm --filter @miaomiao-search/server exec open-websearch serve --port 3210
 ```
 
 ```powershell
@@ -91,6 +91,13 @@ Invoke-WebRequest http://127.0.0.1:3000/ -UseBasicParsing
 - 新增或修改持久化数据、数据库 schema、迁移、公开 API、权限、安全策略、外部依赖或难以撤回的实现方案，先在 `Decisions/` 写出方案并取得用户确认。确认前不得把它实现为既定行为。
 - 多阶段或跨模块任务在 `Progress/` 建立功能进度记录，并同步更新需求台账和功能进度台账。
 - 变更事实后同步更新相应文档；如某份相关文档无需更新，在需求记录或交付说明中写明理由。
+
+## LPK 打包与镜像发布（强制流程）
+
+- 用户要求“打包 LPK”时，必须完整执行镜像发布链路：先运行 `sh lzc/build-image.sh`，构建当前源码对应的 Docker 镜像、推送到 Docker Hub，并通过 `lzc-cli appstore copy-image` 复制到懒猫官方镜像仓库。
+- 只有镜像推送和官方仓库复制都成功、且 `lzc-manifest.yml` 已更新为官方仓库镜像后，才允许运行 `lzc-cli project release -o release/<package>-<version>.lpk` 生成 LPK。
+- 不得只运行 `lzc-cli project build/release` 就交付 LPK；镜像构建、推送或 `copy-image` 任一步失败时必须停止后续打包并向用户报告失败原因。
+- LPK 交付前运行 `lzc-cli project lint`，同时记录 Docker 镜像地址、官方镜像地址、LPK 路径和校验值。除非用户另行要求，打包完成后不自动安装到设备。
 
 ## 实现规则
 

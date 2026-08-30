@@ -2,7 +2,7 @@
 
 ## 状态
 
-已实施。2026-08-23，用户明确要求将 `lazycat_search_portal.html` 的页面与交互迁移为 Next.js JSX，并建立项目内基础组件与各页 mock 数据。
+已实施。2026-08-23，用户明确要求将 `miaomiao_search_portal.html` 的页面与交互迁移为 Next.js JSX，并建立项目内基础组件与各页 mock 数据。
 
 ## 背景
 
@@ -14,7 +14,7 @@
 - 使用一个受控的客户端门户容器保存演示状态；页面、基础组件和 mock 数据分目录维护。
 - 基础组件包含 Button、Card、Input、SearchInput、Tag、Tabs、Switch、Select、Modal、Toast；功能组件按 Search、MCP、Engines、Usage、Settings 分组。
 - mock 数据只用于前端交互还原，不写入数据库、不调用 `/api/*` 或 `/mcp`，也不产生真实 Token、认证或搜索请求。
-- `lazycat_search_portal.html` 保留为历史原型参照，在 Next.js 页面完成验证前不删除。
+- `miaomiao_search_portal.html` 保留为历史原型参照，在 Next.js 页面完成验证前不删除。
 
 ## 取舍
 
