@@ -1,18 +1,18 @@
 {
-  "name": "lazycat-search",
+  "name": "miaomiao-search",
   "version": "0.1.0",
   "private": true,
   "license": "Apache-2.0",
   "scripts": {
     "dev": "next dev --webpack",
-    "build": "pnpm --filter @lazycat-search/server build && next build",
+    "build": "pnpm --filter @miaomiao-search/server build && next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/source-contract.test.mjs && pnpm --filter @lazycat-search/server test",
-    "server:build": "pnpm --filter @lazycat-search/server build",
-    "server:dev": "pnpm --filter @lazycat-search/server dev",
-    "db:migrate": "pnpm --filter @lazycat-search/server db:migrate"
+    "test": "node --test tests/source-contract.test.mjs && pnpm --filter @miaomiao-search/server test",
+    "server:build": "pnpm --filter @miaomiao-search/server build",
+    "server:dev": "pnpm --filter @miaomiao-search/server dev",
+    "db:migrate": "pnpm --filter @miaomiao-search/server db:migrate"
   },
   "dependencies": {
     "next": "^16.0.0",

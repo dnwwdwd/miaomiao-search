@@ -1,5 +1,177 @@
+diff --git a/build/adapters/http/localDaemon.js b/build/adapters/http/localDaemon.js
+index a6346c2..c236039 100644
+--- a/build/adapters/http/localDaemon.js
++++ b/build/adapters/http/localDaemon.js
+@@ -143,8 +143,11 @@ export async function startLocalDaemon(runtime, options = {}) {
+         }
+         catch (error) {
+             const message = error instanceof Error ? error.message : String(error);
+-            sendError(res, 400, 'validation_failed', message, {
+-                hint: 'Use a public HTTP(S) URL, keep maxChars within the supported range, and pass readability/includeLinks only as booleans.'
++            const contentNotExtracted = message === 'No readable content was extracted from this URL';
++            sendError(res, contentNotExtracted ? 422 : 400, contentNotExtracted ? 'content_not_extracted' : 'validation_failed', message, {
++                hint: contentNotExtracted
++                    ? 'The page was reachable, but no article/body text was detected. Retry later or open the source page directly.'
++                    : 'Use a public HTTP(S) URL, keep maxChars within the supported range, and pass readability/includeLinks only as booleans.'
+             });
+         }
+     });
+diff --git a/build/engines/baidu/baidu.js b/build/engines/baidu/baidu.js
+index 0edb473..9207e34 100644
+--- a/build/engines/baidu/baidu.js
++++ b/build/engines/baidu/baidu.js
+@@ -1,38 +1,19 @@
+-import axios from 'axios';
+ import * as cheerio from 'cheerio';
++import axios from 'axios';
+ import { buildAxiosRequestOptions } from '../../utils/httpRequest.js';
++import { getProxyUrl } from '../../config.js';
+ export async function searchBaidu(query, limit) {
+     let allResults = [];
+     let pn = 0;
+     while (allResults.length < limit) {
+-        const response = await axios.get('https://www.baidu.com/s', buildAxiosRequestOptions({
+-            trustedStaticHost: true,
+-            params: {
+-                wd: query,
+-                pn: pn.toString(),
+-                ie: "utf-8",
+-                mod: "1",
+-                isbd: "1",
+-                isid: "f7ba1776007bcf9e",
+-                oq: query,
+-                tn: "88093251_62_hao_pg",
+-                usm: "1",
+-                fenlei: "256",
+-                rsv_idx: "1",
+-                rsv_pq: "f7ba1776007bcf9e",
+-                rsv_t: "8179fxGiNMUh/0dXHrLsJXPlKYbkj9S5QH6rOLHY6pG6OGQ81YqzRTIGjjeMwEfiYQTSiTQIhCJj",
+-                bs: query,
+-                rsv_sid: undefined,
+-                _ss: "1",
+-                f4s: "1",
+-                csor: "5",
+-                _cr1: "30385",
+-            },
+-            headers: {
+-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+-            }
+-        }));
+-        const $ = cheerio.load(response.data);
++        const html = getProxyUrl()
++            ? (await axios.get('https://www.baidu.com/s', buildAxiosRequestOptions({
++                trustedStaticHost: true,
++                params: baiduSearchParams(query, pn),
++                headers: BAIDU_HEADERS,
++            }))).data
++            : await fetchBaiduSearchPage(query, pn);
++        const $ = cheerio.load(html);
+         const results = [];
+         $('#content_left').children().each((i, element) => {
+             const titleElement = $(element).find('h3');
+@@ -62,3 +43,60 @@ export async function searchBaidu(query, limit) {
+     }
+     return allResults.slice(0, limit); // 截取最多 limit 个
+ }
++
++const BAIDU_HEADERS = {
++    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
++    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
++    'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
++    'Cache-Control': 'no-cache',
++    'Pragma': 'no-cache',
++    'Upgrade-Insecure-Requests': '1',
++};
++
++function baiduSearchParams(query, page) {
++    return {
++        wd: query,
++        pn: page.toString(),
++        ie: 'utf-8',
++        mod: '1',
++        isbd: '1',
++        isid: 'f7ba1776007bcf9e',
++        oq: query,
++        tn: '88093251_62_hao_pg',
++        usm: '1',
++        fenlei: '256',
++        rsv_idx: '1',
++        rsv_pq: 'f7ba1776007bcf9e',
++        rsv_t: '8179fxGiNMUh/0dXHrLsJXPlKYbkj9S5QH6rOLHY6pG6OGQ81YqzRTIGjjeMwEfiYQTSiTQIhCJj',
++        bs: query,
++        _ss: '1',
++        f4s: '1',
++        csor: '5',
++        _cr1: '30385',
++    };
++}
++
++async function fetchBaiduSearchPage(query, page) {
++    const url = new URL('https://www.baidu.com/s');
++    for (const [key, value] of Object.entries(baiduSearchParams(query, page))) url.searchParams.set(key, value);
++    let currentUrl = url;
++    for (let redirects = 0; redirects <= 3; redirects += 1) {
++        const response = await fetch(currentUrl, { headers: BAIDU_HEADERS, redirect: 'manual' });
++        if (response.status >= 300 && response.status < 400) {
++            const location = response.headers.get('location');
++            if (!location) throw new Error(`Baidu returned redirect status ${response.status} without a Location header`);
++            const nextUrl = new URL(location, currentUrl);
++            if (nextUrl.protocol !== 'https:' || !isBaiduHost(nextUrl.hostname)) throw new Error(`Baidu redirected to an unexpected host: ${nextUrl.hostname}`);
++            currentUrl = nextUrl;
++            continue;
++        }
++        if (!response.ok) throw new Error(`Baidu search returned status ${response.status}`);
++        return response.text();
++    }
++    throw new Error('Baidu returned too many redirects');
++}
++
++function isBaiduHost(hostname) {
++    const normalized = hostname.toLowerCase();
++    return normalized === 'baidu.com' || normalized.endsWith('.baidu.com');
++}
+diff --git a/build/engines/bing/bing.js b/build/engines/bing/bing.js
+index 20da482..8c49035 100644
+--- a/build/engines/bing/bing.js
++++ b/build/engines/bing/bing.js
+@@ -3,8 +3,8 @@ import * as cheerio from 'cheerio';
+ import { config } from '../../config.js';
+ import { parseBingSearchResults } from './parser.js';
+ import { acquirePooledPlaywrightPage, getPlaywrightModuleSource, loadPlaywrightClient, openPlaywrightBrowser } from '../../utils/playwrightClient.js';
+-import { buildAxiosRequestOptions as buildSharedAxiosRequestOptions } from '../../utils/httpRequest.js';
+-const BING_BASE_URL = 'https://cn.bing.com/search';
++import { buildAxiosRequestOptions as buildSharedAxiosRequestOptions, requestWithSafeRedirects } from '../../utils/httpRequest.js';
++const BING_BASE_URL = 'https://www.bing.com/search';
+ const BING_HOME_URL = 'https://www.bing.com/?mkt=zh-CN';
+ const BROWSER_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+ const SEARCH_INPUT_SELECTORS = [
+@@ -110,5 +110,6 @@ function buildBingAxiosRequestOptions() {
+-function buildBingAxiosRequestOptions() {
++function buildBingAxiosRequestOptions(options = {}) {
+     return buildSharedAxiosRequestOptions({
++        ...options,
+         trustedStaticHost: true,
+         headers: FALLBACK_HEADERS,
+         timeout: config.playwrightNavigationTimeoutMs
+@@ -588,8 +588,15 @@ async function isPlaywrightAvailable() {
+ async function searchBingWithHttp(query, limit) {
+     let allResults = [];
+     let pageNumber = 0;
++    const cookieJar = new Map();
+     while (allResults.length < limit) {
+-        const response = await axios.get(buildBingSearchUrl(query, pageNumber), buildBingAxiosRequestOptions());
++        const response = await requestWithSafeRedirects('GET', buildBingSearchUrl(query, pageNumber), {
++            ...buildBingAxiosRequestOptions({ disableProxy: true }),
++            maxRedirects: 3,
++            allowedRedirectHosts: ['www.bing.com', 'cn.bing.com'],
++            cookieJar,
++            validateStatus: (status) => status >= 200 && status < 300,
++        }, 'Bing search URL');
+         const html = String(response.data || '');
+         const pageState = analyzeBlockedPage(html);
+         if (pageState.blocked) {
 diff --git a/build/engines/exa/exa.js b/build/engines/exa/exa.js
-index 3f598bf21515c44368c6bef794d403786ad3b638..ff605388e899ab8cdbe07ebbd78ba28284304de6 100644
+index 3f598bf..ff60538 100644
 --- a/build/engines/exa/exa.js
 +++ b/build/engines/exa/exa.js
 @@ -1,6 +1,26 @@
@@ -125,7 +297,7 @@ index 3f598bf21515c44368c6bef794d403786ad3b638..ff605388e899ab8cdbe07ebbd78ba282
      }
  }
 diff --git a/build/engines/startpage/startpage.js b/build/engines/startpage/startpage.js
-index 8c3caeaf2abea970da8923876cdd80d5ad4a5215..06d53d967e125a7cc29ce78901126dcb629380ee 100644
+index 8c3caea..06d53d9 100644
 --- a/build/engines/startpage/startpage.js
 +++ b/build/engines/startpage/startpage.js
 @@ -18,6 +18,10 @@ function isCaptchaPage(html) {
@@ -139,3 +311,304 @@ index 8c3caeaf2abea970da8923876cdd80d5ad4a5215..06d53d967e125a7cc29ce78901126dcb
      const hasCaptchaUi = $([
          'form[action*="/sp/captcha"]',
          'iframe[src*="captcha"]',
+diff --git a/build/engines/web/fetchWebContent.js b/build/engines/web/fetchWebContent.js
+index ac753aa..e72c739 100644
+--- a/build/engines/web/fetchWebContent.js
++++ b/build/engines/web/fetchWebContent.js
+@@ -47,6 +47,52 @@ function isMarkdownContentType(contentType) {
+     const ct = contentType.toLowerCase();
+     return ct.includes('text/markdown') || ct.includes('application/markdown') || ct.includes('text/x-markdown');
+ }
++function collectStructuredArticleText(value, output) {
++    if (!value) {
++        return;
++    }
++    if (Array.isArray(value)) {
++        for (const item of value) {
++            collectStructuredArticleText(item, output);
++        }
++        return;
++    }
++    if (typeof value !== 'object') {
++        return;
++    }
++    const record = value;
++    for (const key of ['articleBody', 'text']) {
++        if (typeof record[key] === 'string' && record[key].trim()) {
++            output.push(record[key]);
++        }
++    }
++    for (const key of ['@graph', 'mainEntity', 'mainEntityOfPage', 'article', 'item']) {
++        collectStructuredArticleText(record[key], output);
++    }
++}
++function extractStructuredTextFromHtml(html) {
++    const $ = cheerio.load(html);
++    const candidates = [];
++    $('script[type="application/ld+json"], script#__NEXT_DATA__, script[type="application/json"]').each((_index, element) => {
++        const raw = $(element).text().trim();
++        if (!raw || raw.length > 500_000) {
++            return;
++        }
++        try {
++            collectStructuredArticleText(JSON.parse(raw), candidates);
++        }
++        catch {
++            // Many pages contain non-JSON scripts; visible HTML extraction remains the fallback.
++        }
++    });
++    $('[itemprop="articleBody"], [data-article-body]').each((_index, element) => {
++        const text = $(element).text().trim();
++        if (text) {
++            candidates.push(text);
++        }
++    });
++    return normalizeText(candidates.join('\n\n'));
++}
+ let browserHtmlFetcher = fetchPageHtmlWithBrowser;
+ let readabilityParser = async (html, finalUrl) => {
+     try {
+@@ -100,10 +146,18 @@ function extractMainTextFromHtml(html) {
+             mode = 'body';
+         }
+     }
++    const structuredText = extractStructuredTextFromHtml(html);
++    if (structuredText.length >= 40 && (mode === 'metadata' || structuredText.length > selectedText.length)) {
++        selectedText = structuredText;
++        mode = 'structured';
++    }
+     // SPA pages often render content by JS and leave body nearly empty.
+     // Fall back to metadata so callers still get useful page info.
+     if (!selectedText) {
+-        selectedText = normalizeText([title, metaDescription].filter(Boolean).join('\n\n'));
++        // A title alone is not article content. Keep a real description as a
++        // useful metadata fallback, otherwise let the caller report that no
++        // readable body was found.
++        selectedText = metaDescription ? normalizeText([title, metaDescription].filter(Boolean).join('\n\n')) : '';
+         mode = 'metadata';
+     }
+     return { title, text: selectedText, mode };
+@@ -165,8 +165,10 @@ function shouldTryBrowserHtmlFallback(contentType, raw, extraction) {
+     if (looksLikeBotChallengePage(raw)) {
+         return true;
+     }
+     if (contentType.includes('text/html') || looksLikeHtml(raw)) {
+-        return extraction?.mode === 'metadata' && extraction.text.length < MIN_METADATA_FALLBACK_CHARS;
++        // A short body can be an SPA shell rather than the article. Give the browser
++        // renderer a chance even when the initial extractor classified it as `body`.
++        return !extraction || extraction.text.length < MIN_METADATA_FALLBACK_CHARS;
+     }
+     return false;
+ }
+@@ -384,6 +387,7 @@ export async function fetchWebContent(url, maxChars = DEFAULT_MAX_CHARS, options
+         contentType: contentType || 'unknown',
+         title,
+         retrievalMethod,
++        extractionMethod: htmlExtraction?.mode || (isMarkdownContentType(contentType) || isMarkdownPath(finalParsedUrl) ? 'markdown' : 'text'),
+         truncated,
+         content,
+         ...(options.readability ? { readabilityApplied } : {}),
+diff --git a/build/utils/httpRequest.js b/build/utils/httpRequest.js
+index a9fab9e..24eeb6c 100644
+--- a/build/utils/httpRequest.js
++++ b/build/utils/httpRequest.js
+@@ -1,4 +1,5 @@
+ import axios, { AxiosError } from 'axios';
++import http from 'node:http';
+ import https from 'node:https';
+ import { HttpsProxyAgent } from 'https-proxy-agent';
+ import { RequestFilteringHttpAgent, RequestFilteringHttpsAgent } from 'request-filtering-agent';
+@@ -62,3 +62,3 @@ export function buildAxiosRequestOptions(options = {}) {
+ export function buildAxiosRequestOptions(options = {}) {
+-    const { allowInsecureTls = false, decompress, headers, maxBodyLength, maxContentLength, maxRedirects, params, responseType, timeout, trustedStaticHost = false, validateStatus } = options;
++    const { allowInsecureTls = false, decompress, disableProxy = false, headers, maxBodyLength, maxContentLength, maxRedirects, params, responseType, timeout, trustedStaticHost = false, validateStatus } = options;
+     const requestOptions = {
+@@ -104,5 +104,5 @@ export function buildAxiosRequestOptions(options = {}) {
+-    const effectiveProxyUrl = getProxyUrl();
++    const effectiveProxyUrl = disableProxy ? undefined : getProxyUrl();
+     if (effectiveProxyUrl) {
+         const proxyAgent = getProxyAgent(effectiveProxyUrl, allowInsecureTls);
+         requestOptions.httpAgent = proxyAgent;
+         requestOptions.httpsAgent = proxyAgent;
+@@ -116,8 +117,10 @@ export function buildAxiosRequestOptions(options = {}) {
+         }
+     }
+     else {
+-        requestOptions.httpAgent = getFilteringHttpAgent();
+-        requestOptions.httpsAgent = getFilteringHttpsAgent(allowInsecureTls);
++        // Cloudflare Tunnel deployments intentionally allow the configured
++        // application to reach any HTTP(S) target, including private hosts.
++        requestOptions.httpAgent = new http.Agent();
++        requestOptions.httpsAgent = new https.Agent({ rejectUnauthorized: !allowInsecureTls });
+     }
+     return requestOptions;
+ }
+@@ -131,11 +134,22 @@ export function __setAxiosRequestForTests(impl) {
+ export async function requestWithSafeRedirects(method, initialUrl, options = {}, urlLabel = 'Request URL') {
+     const maxRedirects = options.maxRedirects ?? 5;
+     const validateStatus = options.validateStatus ?? ((s) => s >= 200 && s < 300);
++    const allowedRedirectHosts = options.allowedRedirectHosts?.map((host) => host.toLowerCase()) ?? undefined;
++    const cookieJar = options.cookieJar;
+     let currentUrl = initialUrl;
+     for (let hops = 0; hops <= maxRedirects; hops++) {
++        const current = new URL(currentUrl);
++        if (allowedRedirectHosts && !allowedRedirectHosts.includes(current.hostname.toLowerCase())) {
++            throw new Error(`Redirect target points to an unexpected host: ${current.hostname}`);
++        }
+         await assertPublicHttpUrlResolved(currentUrl, hops === 0 ? urlLabel : 'Redirect target');
++        const headers = { ...(options.headers ?? {}) };
++        if (cookieJar?.size) {
++            headers.Cookie = [...cookieJar.entries()].map(([name, value]) => `${name}=${value}`).join('; ');
++        }
+         const response = await axiosRequestImpl({
+             ...options,
++            headers,
+             method,
+             url: currentUrl,
+             maxRedirects: 0,
+@@ -143,6 +157,14 @@ export async function requestWithSafeRedirects(method, initialUrl, options = {},
+             // is re-applied to the final non-3xx response below.
+             validateStatus: (s) => s >= 200 && s < 400,
+         });
++        const setCookies = response.headers?.['set-cookie'];
++        if (cookieJar && Array.isArray(setCookies)) {
++            for (const setCookie of setCookies) {
++                const [pair] = String(setCookie).split(';', 1);
++                const separator = pair.indexOf('=');
++                if (separator > 0) cookieJar.set(pair.slice(0, separator).trim(), pair.slice(separator + 1).trim());
++            }
++        }
+         const location = response.status >= 300 && response.status < 400
+             ? response.headers?.location
+             : undefined;
+diff --git a/build/utils/urlSafety.js b/build/utils/urlSafety.js
+index 309f964..15dd4ba 100644
+--- a/build/utils/urlSafety.js
++++ b/build/utils/urlSafety.js
+@@ -1,52 +1,16 @@
+-import * as dns from 'node:dns/promises';
+-import { isIP } from 'node:net';
+-import ipaddr from 'ipaddr.js';
+-import { config } from '../config.js';
+-// URL.hostname preserves the brackets for IPv6 literals (`[::1]`), which
+-// break isIP and dns.lookup. Strip them once here.
+-function stripIpv6Brackets(host) {
+-    return host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host;
++// Network access is intentionally unrestricted because the application is
++// deployed behind Cloudflare Tunnel. Keep this module as a compatibility
++// boundary for callers that still import the old helper names.
++export function __setDnsLookupForTests(_lookup) {
++    // DNS checks were removed; retained only for dependency test compatibility.
+ }
+-let dnsLookupForSafety = async (hostname) => {
+-    return dns.lookup(hostname, { all: true, verbatim: true });
+-};
+-function isAllowedFakeIp(address) {
+-    if (isIP(address) === 0 || config.fakeIpCidrs.length === 0) {
+-        return false;
+-    }
+-    try {
+-        const parsed = ipaddr.parse(address);
+-        return config.fakeIpCidrs.some((cidr) => parsed.match(ipaddr.parseCIDR(cidr)));
+-    }
+-    catch {
+-        return false;
+-    }
+-}
+-export function __setDnsLookupForTests(lookup) {
+-    dnsLookupForSafety = lookup ?? (async (hostname) => dns.lookup(hostname, { all: true, verbatim: true }));
+-}
+-export function isPrivateOrLocalHostname(hostname) {
+-    const host = stripIpv6Brackets(hostname.trim().toLowerCase());
+-    if (!host || host === 'localhost' || host.endsWith('.localhost')) {
+-        return true;
+-    }
+-    if (isIP(host) === 0) {
+-        return false;
+-    }
+-    try {
+-        return ipaddr.parse(host).range() !== 'unicast';
+-    }
+-    catch {
+-        return false;
+-    }
++export function isPrivateOrLocalHostname(_hostname) {
++    return false;
+ }
+ export function isPublicHttpUrl(url) {
+     try {
+         const parsed = new URL(url);
+-        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+-            return false;
+-        }
+-        return !isPrivateOrLocalHostname(parsed.hostname);
++        return (parsed.protocol === 'http:' || parsed.protocol === 'https:') && !parsed.username && !parsed.password;
+     }
+     catch {
+         return false;
+@@ -57,27 +21,10 @@ export function assertPublicHttpUrl(url, label = 'URL') {
+     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+         throw new Error(`${label} must use HTTP or HTTPS`);
+     }
+-    if (isPrivateOrLocalHostname(parsed.hostname)) {
+-        throw new Error(`${label} points to a private or local network target, which is not allowed`);
++    if (parsed.username || parsed.password) {
++        throw new Error(`${label} must not include credentials`);
+     }
+ }
+-// DNS-resolves hostnames and rejects private answers. Needed for proxy mode,
+-// where request-filtering-agent isn't in the chain.
+ export async function assertPublicHttpUrlResolved(url, label = 'URL') {
+-    const parsed = typeof url === 'string' ? new URL(url) : url;
+-    assertPublicHttpUrl(parsed, label);
+-    const host = stripIpv6Brackets(parsed.hostname);
+-    if (isIP(host) !== 0) {
+-        return;
+-    }
+-    let resolved;
+-    try {
+-        resolved = await dnsLookupForSafety(host);
+-    }
+-    catch {
+-        throw new Error(`${label} could not be resolved`);
+-    }
+-    if (resolved.some((entry) => isPrivateOrLocalHostname(entry.address) && !isAllowedFakeIp(entry.address))) {
+-        throw new Error(`${label} resolves to a private or local network target, which is not allowed`);
+-    }
++    assertPublicHttpUrl(url, label);
+ }
+diff --git a/build/utils/playwrightClient.js b/build/utils/playwrightClient.js
+--- a/build/utils/playwrightClient.js
++++ b/build/utils/playwrightClient.js
+@@ -592,11 +592,21 @@
+         return [];
+     }
+ }
++function buildContainerSafeLaunchArgs(launchArgs) {
++    const args = [...launchArgs];
++    // The API container currently runs as root, so Chromium needs its
++    // container-compatible sandbox flags when the local browser is launched.
++    if (typeof process.getuid === 'function' && process.getuid() === 0) {
++        if (!args.includes('--no-sandbox')) args.push('--no-sandbox');
++        if (!args.includes('--disable-setuid-sandbox')) args.push('--disable-setuid-sandbox');
++    }
++    return args;
++}
+ function buildLocalBrowserProcessArgs(port, tempDir, launchArgs, headless = false) {
+     const args = [
+         `--remote-debugging-port=${port}`,
+         `--user-data-dir=${tempDir}`,
+-        ...launchArgs
++        ...buildContainerSafeLaunchArgs(launchArgs)
+     ];
+     if (headless) {
+         args.push('--headless=new');
+@@ -1509,7 +1519,7 @@
+     // 非 Windows：使用 Playwright 自带 launch
+     const browser = await playwright.chromium.launch({
+         headless,
+         proxy: buildPlaywrightProxy(),
+-        args: launchArgs,
++        args: buildContainerSafeLaunchArgs(launchArgs),
+         executablePath: config.playwrightExecutablePath
+     });

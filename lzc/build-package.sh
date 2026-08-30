@@ -3,25 +3,27 @@ set -eu
 
 REPO_ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 DIST_ROOT="$REPO_ROOT/lzc-dist"
+MANIFEST="$REPO_ROOT/lzc-manifest.yml"
+
+if grep -q 'REPLACE_ME' "$MANIFEST"; then
+  echo "lzc-manifest.yml still contains a placeholder image. Run lzc/build-image.sh first." >&2
+  exit 1
+fi
+
+IMAGE_LINES=$(grep -E '^[[:space:]]+image:[[:space:]]+registry\.lazycat\.cloud/' "$MANIFEST" | wc -l | tr -d ' ')
+if [ "$IMAGE_LINES" -lt 2 ]; then
+  echo "The release manifest must reference the copied Lazycat registry image for web and api." >&2
+  exit 1
+fi
+
+if grep -E '^[[:space:]]+image:' "$MANIFEST" | grep -v 'registry.lazycat.cloud/' >/dev/null 2>&1; then
+  echo "All runtime service images must come from registry.lazycat.cloud." >&2
+  exit 1
+fi
 
 rm -rf "$DIST_ROOT"
 mkdir -p "$DIST_ROOT"
-
-cd "$REPO_ROOT"
-export npm_config_platform=linux
-export npm_config_arch=x64
-export npm_config_libc=glibc
-
-pnpm install --frozen-lockfile
-pnpm build
-
-mkdir -p "$DIST_ROOT/web/.next"
-cp -R .next/standalone/. "$DIST_ROOT/web/"
-cp -R .next/static "$DIST_ROOT/web/.next/static"
-
-pnpm --filter @lazycat-search/server deploy --prod --legacy "$DIST_ROOT/api"
-cp -R packages/server/dist "$DIST_ROOT/api/dist"
-cp -R packages/server/drizzle "$DIST_ROOT/api/drizzle"
-mkdir -p "$DIST_ROOT/lzc"
-cp "$REPO_ROOT/lzc/run-api.sh" "$DIST_ROOT/lzc/run-api.sh"
-cp "$REPO_ROOT/lzc/run-web.sh" "$DIST_ROOT/lzc/run-web.sh"
+cat > "$DIST_ROOT/README.txt" <<'EOF'
+Miaomiao Search runtime files are delivered by the official Lazycat container image.
+Persistent data is stored under /lzcapp/var/miaomiao-search/data.
+EOF

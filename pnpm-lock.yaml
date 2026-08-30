@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   open-websearch@2.1.11:
-    hash: d208155e14f63c1206c23b7ba5a0cd1f142d42367b02f1c9e70c752eca800e42
+    hash: cea101527114d94ebea5eae85fedc1078f386b528d9563864b706ec5d7edf604
     path: patches/open-websearch@2.1.11.patch
 
 importers:
@@ -59,9 +59,6 @@ importers:
       '@fastify/rate-limit':
         specifier: ^10.3.0
         version: 10.3.0
-      '@modelcontextprotocol/fastify':
-        specifier: ^2.0.0
-        version: 2.0.0(@modelcontextprotocol/server@2.0.0)(fastify@5.12.1)
       '@modelcontextprotocol/node':
         specifier: ^2.0.0
         version: 2.0.0(@modelcontextprotocol/server@2.0.0)(hono@4.13.3)
@@ -77,15 +74,15 @@ importers:
       fastify:
         specifier: ^5.6.2
         version: 5.12.1
-      ipaddr.js:
-        specifier: ^2.2.0
-        version: 2.5.0
       jose:
         specifier: ^6.1.0
         version: 6.2.10
       open-websearch:
         specifier: 2.1.11
-        version: 2.1.11(patch_hash=d208155e14f63c1206c23b7ba5a0cd1f142d42367b02f1c9e70c752eca800e42)
+        version: 2.1.11(patch_hash=cea101527114d94ebea5eae85fedc1078f386b528d9563864b706ec5d7edf604)
+      playwright-core:
+        specifier: ^1.62.1
+        version: 1.62.1
       zod:
         specifier: ^4.1.12
         version: 4.4.3
@@ -968,13 +965,6 @@ packages:
   '@modelcontextprotocol/core@2.0.0':
     resolution: {integrity: sha512-pJCEwGG7Lfr/+PQp9ZTwKXNeO5wzbfKL7H3MYpCorM4oFBoQrdjnBgEoqG+RjhsvS1FKrDbKux+M1HhlnGWqcA==}
     engines: {node: '>=20'}
-
-  '@modelcontextprotocol/fastify@2.0.0':
-    resolution: {integrity: sha512-x41AmyQ+olgAjX8EBkVpCztxIcWaInUlVpEatUBSWINZAmTnQYSYqOp9eigb7dxE2W+CtzhP1H+9uUgHRxJPVg==}
-    engines: {node: '>=20'}
-    peerDependencies:
-      '@modelcontextprotocol/server': ^2.0.0
-      fastify: ^5.2.0
 
   '@modelcontextprotocol/node@2.0.0':
     resolution: {integrity: sha512-Y4hAC2XdGDUdDOCbLDOCA4+aL3NUldjsOWlDL/YwpAxrPhRm1xHd7lZ+mLacvZ9t3PaH28wgNoaLQGrIk1P2pg==}
@@ -2990,6 +2980,11 @@ packages:
     resolution: {integrity: sha512-ueGLflrrnvwB3xuo/uGob5pd5FN7l0MsLf0Z87o/UQmRtwjvfylfc9MurIxRAWywCYTgrvpXBcqjV4OfCYGCIQ==}
     engines: {node: '>=16.20.0'}
 
+  playwright-core@1.62.1:
+    resolution: {integrity: sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw==}
+    engines: {node: '>=20'}
+    hasBin: true
+
   possible-typed-array-names@1.1.0:
     resolution: {integrity: sha512-/+5VFTchJDoVj3bhoqi6UeymcD00DAwb1nJwamzPvHEszJ4FpF6SNNbUbOS8yI56qHzdV8eK0qEfOSiodkTdxg==}
     engines: {node: '>= 0.4'}
@@ -4269,11 +4264,6 @@ snapshots:
   '@modelcontextprotocol/core@2.0.0':
     dependencies:
       zod: 4.4.3
-
-  '@modelcontextprotocol/fastify@2.0.0(@modelcontextprotocol/server@2.0.0)(fastify@5.12.1)':
-    dependencies:
-      '@modelcontextprotocol/server': 2.0.0
-      fastify: 5.12.1
 
   '@modelcontextprotocol/node@2.0.0(@modelcontextprotocol/server@2.0.0)(hono@4.13.3)':
     dependencies:
@@ -6421,7 +6411,7 @@ snapshots:
     dependencies:
       wrappy: 1.0.2
 
-  open-websearch@2.1.11(patch_hash=d208155e14f63c1206c23b7ba5a0cd1f142d42367b02f1c9e70c752eca800e42):
+  open-websearch@2.1.11(patch_hash=cea101527114d94ebea5eae85fedc1078f386b528d9563864b706ec5d7edf604):
     dependencies:
       '@modelcontextprotocol/sdk': 1.30.0(zod@3.25.76)
       '@mozilla/readability': 0.6.0
@@ -6545,6 +6535,8 @@ snapshots:
       thread-stream: 4.2.0
 
   pkce-challenge@5.0.0: {}
+
+  playwright-core@1.62.1: {}
 
   possible-typed-array-names@1.1.0: {}
 

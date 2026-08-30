@@ -3,3 +3,6 @@ manifest: ./lzc-manifest.yml
 contentdir: ./lzc-dist
 pkgout: ./release
 icon: ./lzc-icon.png
+resource_exports:
+  - kind: mcp-providers
+    source: ./resources/mcp-providers

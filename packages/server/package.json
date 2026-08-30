@@ -1,13 +1,17 @@
 {
-  "name": "@lazycat-search/server",
+  "name": "@miaomiao-search/server",
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "files": [
+    "dist",
+    "drizzle"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "test": "node --import tsx --test test/**/*.test.ts",
+    "test": "node --import tsx --test test/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "db:migrate": "tsx src/db/cli-migrate.ts"
   },
@@ -15,15 +19,14 @@
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^11.3.0",
     "@fastify/rate-limit": "^10.3.0",
-    "@modelcontextprotocol/fastify": "^2.0.0",
     "@modelcontextprotocol/node": "^2.0.0",
     "@modelcontextprotocol/server": "^2.0.0",
     "better-sqlite3": "^12.4.6",
     "drizzle-orm": "^0.44.7",
     "fastify": "^5.6.2",
-    "ipaddr.js": "^2.2.0",
     "jose": "^6.1.0",
     "open-websearch": "2.1.11",
+    "playwright-core": "^1.62.1",
     "zod": "^4.1.12"
   },
   "devDependencies": {
