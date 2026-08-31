@@ -6,7 +6,7 @@ title: "Miaomiao Search 技术实现文档"
 
 # Miaomiao Search 技术实现文档
 
-> 项目名：miaomiao-search　基础项目：Open-WebSearch　文档版本：v1.0　实现同步：2026-08-29
+> 项目名：miaomiao-search　基础项目：Open-WebSearch　文档版本：v1.1　实现同步：2026-08-31
 
 ## 1. 技术栈总览
 
@@ -256,7 +256,7 @@ CREATE TABLE setting (
 | `cache.content.enabled` | `true` | 正文缓存开关 |
 | `cache.content.ttl` | `86400` | 正文缓存 TTL（秒） |
 | `rateLimit.web.rpm` | `30` | Web 每 IP 每分钟请求上限 |
-| `search.defaultEngines` | `["bing","duckduckgo"]` | 默认搜索引擎 |
+| `search.defaultEngines` | `["bing","baidu","csdn","juejin","sogou"]` | 兼容保留的默认引擎设置；bootstrap 不因新增 Provider 覆盖已有用户值 |
 | `search.defaultLimit` | `10` | 搜索默认返回数；未单独配置引擎数量时使用 |
 | `search.maxLimit` | `50` | 最大结果数量 |
 | `fetch.maxChars` | `50000` | 正文最大字符数 |
@@ -385,6 +385,8 @@ export interface SearchResult {
   title: string;
   url: string;
   description: string;
+  thumbnailUrl?: string;
+  videoMeta?: { author?: string; duration?: string; views?: number; likes?: number; favorites?: number; comments?: number; publishedAt?: number };
   engine: string;
 }
 
@@ -423,7 +425,7 @@ export abstract class SearchEngine {
 
 ### 4.4 多引擎聚合搜索
 
-当前实现已按引擎独立发起搜索并返回 `engineResults[]` 分组结果，同时保留 `results` 平铺聚合结果以兼容现有 MCP 客户端。每个引擎的有效数量为 `min(调用方 limit, engine.result_limit 或 search.defaultLimit)`，先按引擎截取，再按规范化 URL 去重并合并来源标签。`engine.result_limit` 为空时使用搜索默认值（初始 10）；管理 API、首页分组视图、历史兼容和 MCP 已完成接入。
+当前实现已按引擎独立发起搜索并返回 `engineResults[]` 分组结果，同时保留 `results` 平铺聚合结果以兼容现有 MCP 客户端。每个引擎的有效数量为 `min(调用方 limit, engine.result_limit 或 search.defaultLimit, Provider.maxResults, search.maxLimit)`，先按引擎截取，再按规范化 URL 去重并合并来源标签；同 URL 的已有结果没有封面或视频元数据时会补入后续 Provider 的 `thumbnailUrl`/`videoMeta`。`engine.result_limit` 为空时使用搜索默认值（初始 10）；管理 API、首页分组/聚合视图、历史兼容和 MCP 已完成接入。
 
 ```typescript
 // services/search.ts
@@ -525,7 +527,7 @@ const contentCache = new LRUCache<string, CachedContent>({
 ```
 
 缓存 Key 生成策略：
-- 搜索：每个引擎独立使用 `SHA-256(query + engine + effectiveLimit + searchMode)`；配置数量变化自然切换缓存键
+- 搜索：每个引擎独立使用 `query + engine + effectiveLimit + searchMode + providerVersion`；Provider 版本变化自然切换缓存键，凭据保存或清除会清空当前用户搜索缓存
 - 正文：`JSON.stringify({ url, maxChars, extractor: "multi-strategy-v3" })`；提取策略升级时通过版本字段主动避开旧正文结果
 
 Web 和 MCP 共用同一缓存实例。
@@ -571,6 +573,12 @@ export function getLogs(params: { page, pageSize, channel?, operation?, tokenId?
 ```
 
 当前 Usage 实现由 `AuditService.usage()` 提供范围统计，接口参数为 `from`、`to`、`channel`、`operation`、`status`、`engine`、`page`、`pageSize` 和 `timeZone`。默认范围为最近 7 天，查询最多 365 天；范围使用左闭右开时间比较。响应同时返回 summary、Web/MCP channel 分布、按用户时区生成的小时/日趋势、Operation 统计、引擎统计、facets 和分页 logs。MCP `search` 与 `fetchWebContent` 通过 `SearchService` 分别写入 `channel=mcp` 的对应审计记录，统计不会读取或重复计算 `search_history` 快照。
+
+### 4.9 Provider Registry 与外部搜索源
+
+`packages/server/src/providers/registry.ts` 为每个用户实例创建 Provider。六个旧引擎使用 `OpenWebSearchProvider`，Exa、Firecrawl、Tavily、GitHub 和 Bilibili 在 Fastify 内直接访问固定 HTTPS Endpoint：Exa `/search`、Firecrawl `/v2/search`、Tavily `/search`、GitHub REST `search.repos` 和 Bilibili `/x/web-interface/search/all/v2`。通用 HTTP 工具支持可注入 `fetch`、超时、2 MiB 响应体上限、禁止自动重定向，并在非 2xx 时保留状态码与响应头；不会记录 Authorization、Cookie、完整响应体或带敏感信息的请求 URL。
+
+Exa、Firecrawl 与 Tavily 从当前用户的 `SettingsService` 读取加密 API Key；GitHub 使用 `@octokit/rest`，查询追加 `is:public`，只返回公共仓库并按 Token 变化重建 Client。Exa 的 Web/MCP 请求直接由 Fastify 发往官方 Search API，不依赖 `EXA_API_KEY` 环境变量。Bilibili 不使用登录态，首次 HTTP 412 或 `code=-412` 时只做一次首页匿名 Cookie 预热和一次重试，Cookie 只存在单次调用内存中。Bilibili 结果只接受视频分组，过滤直播条目，清理 HTML/实体并校验 `thumbnailUrl` 必须是无凭据 HTTPS `*.hdslb.com` URL，同时透传作者、时长、播放、点赞、收藏、评论和发布时间等可选 `videoMeta`。
 
 ## 5. MCP Server 实现
 
@@ -732,6 +740,7 @@ PortalShell     -> Search / MCP / Engines / Usage / Settings 页面 JSX
       "title": "...",
       "url": "https://...",
       "description": "...",
+      "thumbnailUrl": "https://i0.hdslb.com/...",
       "engines": ["bing", "duckduckgo"]
     }
   ],
@@ -756,8 +765,10 @@ PortalShell     -> Search / MCP / Engines / Usage / Settings 页面 JSX
 | Method | Path | Auth | 说明 |
 |--------|------|------|------|
 | GET | `/api/engines` | 应用会话 | 引擎列表 |
-| PATCH | `/api/engines/:id` | 应用会话 | 修改引擎配置（enabled, isDefault, searchMode, resultLimit；resultLimit 可为 null 清空） |
+| PATCH | `/api/engines/:id` | 应用会话 | 修改引擎配置（enabled, isDefault, searchMode, resultLimit；resultLimit 可为 null 清空；apiKey 可用于支持必需/可选凭据的引擎） |
 | POST | `/api/engines/:id/test` | 应用会话 | 测试搜索 |
+
+`GET /api/engines` 在保留旧字段的同时返回 `supportsApiKey`、`apiKeyOptional`、`credentialLabel`、`credentialPlaceholder`、固定官方申请入口 `credentialUrl` 和 `maxResults`。Exa/Firecrawl/Tavily 的 Key 必须配置后才能启用；GitHub 无 Token 也可启用；B站提交 `apiKey` 返回不支持错误。启用前和修改结果数量时由服务端校验 Provider 约束，凭据变化会清空当前用户搜索缓存。
 
 ### 7.4 Token 管理
 
@@ -957,3 +968,15 @@ provider 文件位于 `resources/mcp-providers/miaomiao-search/mcp.yml`，内容
 - Legacy SSE Transport 兼容
 - 搜索结果导出
 - 引擎定时健康检查
+
+## 11. 四类新增搜索源实现（2026-08-31）
+
+当前搜索目录包含 11 个引擎：Bing、Baidu、DuckDuckGo、Exa、CSDN、Juejin、Sogou、Firecrawl、Tavily、GitHub 和 Bilibili。四个新增引擎首次写入用户库时均为关闭状态，bootstrap 只插入缺失引擎，不覆盖已有用户的启用、默认、数量和顺序配置。
+
+Fastify 为每个用户实例创建 `SearchProviderRegistry`。六个旧引擎通过 `OpenWebSearchProvider` 继续调用 daemon；Exa、Firecrawl、Tavily、GitHub 和 Bilibili 在 Fastify 内使用固定 HTTPS Endpoint。正文抓取仍由 `SearchService` 复用 Open-WebSearch 链路，不与搜索 Provider 混用。
+
+统一 `SearchResult` 增加可选 `thumbnailUrl` 与 `videoMeta`。Bilibili 只解析 `result_type=video`，过滤 `live_room`，清理标题和摘要 HTML/实体，生成 BVID 视频链接；`pic` 仅接受无凭据的 HTTPS `*.hdslb.com` URL。封面由 Web、聚合结果和历史快照按 16:9 右侧缩略图展示，点击 B站结果进入视频详情弹窗而不读取网页正文；浏览器使用 lazy loading、`no-referrer` 和 favicon 回退，服务端不下载、代理或持久化图片。
+
+Exa、Firecrawl 与 Tavily 使用当前用户的加密 Key，GitHub Token 可选且查询固定追加 `is:public` 并过滤私有仓库；Bilibili 不读取登录态。Bilibili 首次收到 HTTP 412 或响应 `code=-412` 时只做一次匿名首页 Cookie 预热和一次重试，Cookie 只存在本次调用内存中。通用 HTTP 工具限制 20 秒级超时、2 MiB 响应体、禁止自动重定向，并保留非 2xx 状态码和响应头用于 Provider 错误映射。
+
+MCP `search` Tool 名称与返回结构保持不变，工具描述和引擎枚举按当前用户启用状态及 MCP 顺序动态生成。引擎管理 API 返回凭据模式、标签、占位符和 Provider `maxResults`；必需 Key、可选 Token、Bilibili 无凭据和健康状态映射均由服务端校验。默认 CI 使用注入的 fetch/Octokit Client 测试，不访问真实外部 API。

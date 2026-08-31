@@ -1,4 +1,4 @@
-export const engineIds = ["bing", "baidu", "duckduckgo", "exa", "csdn", "juejin", "sogou"] as const;
+export const engineIds = ["bing", "baidu", "duckduckgo", "exa", "csdn", "juejin", "sogou", "firecrawl", "tavily", "github", "bilibili"] as const;
 export type EngineId = (typeof engineIds)[number];
 
 /**
@@ -29,6 +29,16 @@ export type SearchResult = {
   url: string;
   description: string;
   faviconUrl?: string;
+  thumbnailUrl?: string;
+  videoMeta?: {
+    author?: string;
+    duration?: string;
+    views?: number;
+    likes?: number;
+    favorites?: number;
+    comments?: number;
+    publishedAt?: number;
+  };
   engines: EngineId[];
 };
 

@@ -1,21 +1,23 @@
 # DEC-20260825-003：搜索引擎启用前置条件与凭据配置
 
+> Exa 凭据“重启独立 daemon 后生效”的历史方案已被 `DEC-20260831-003` 取代。当前 Exa Provider 直接读取当前用户加密设置，保存后立即生效；本记录其余引擎启用前校验仍有效。
+
 ## 状态
 
-待用户确认。
+已实施；Exa 的生效边界由 `DEC-20260831-003` 更新。
 
-注：本记录中关于 DuckDuckGo 代理地址和 `proxy.enabled` 的启用校验已由 `DEC-20260825-011` 取代；当前仅 Exa API Key 仍由服务端作为启用前置条件校验。
+注：本记录中关于 DuckDuckGo 代理地址和 `proxy.enabled` 的启用校验已由 `DEC-20260825-011` 取代；Exa 仍由服务端校验 Key 是否已配置，但请求由 Fastify Provider 直接执行。
 
 ## 背景
 
-用户要求移除 Brave，并在启用需要代理或 API Key 的搜索引擎时先检查配置；API Key 通过引擎管理页弹窗配置。当前 Exa 的补丁只从独立 Open-WebSearch daemon 的 `EXA_API_KEY` 环境变量读取密钥，门户与 daemon 是两个进程；现有 SQLite `setting` 表支持加密敏感配置，但没有引擎凭据字段或启用前置检查。
+用户要求移除 Brave，并在启用需要代理或 API Key 的搜索引擎时先检查配置；API Key 通过引擎管理页弹窗配置。当前实现已将 Exa 请求迁移至 Fastify Provider，凭据写入当前用户 SQLite `setting` 表并加密保存。
 
 ## 提议方案
 
 1. 从 `engineIds`、默认引擎、门户数据、测试和历史样例中移除 Brave，并新增一次数据库迁移删除既有 `brave` 行；历史审计文本保留，不再把 Brave 作为可选引擎。
 2. 将 Exa 标记为需要 API Key；将需要通过 Open-WebSearch 代理访问的引擎标记为需要代理。引擎管理页点击启用时，服务端检查代理是否启用且地址为完整 HTTP(S) URL，API Key 是否已配置；不满足时返回明确错误，前端只显示消息，不改变开关状态。
 3. API Key 通过引擎管理页弹窗录入。服务端写入已有 `setting` 表的 `engine.<id>.apiKey`，使用现有 AES-256-GCM 设置加密；GET 接口只返回 `apiKeyConfigured`，不返回明文。清空密钥通过弹窗的“清除”操作完成。
-4. 由于当前 daemon 是独立进程，保存 API Key 后服务端无法修改已运行 daemon 的进程环境；保存成功提示“需要按当前启动方式重启 Open-WebSearch daemon 后生效”，启用检查只保证门户侧配置完整。若用户希望无需重启，需要另立决策改造 daemon 配置通道或把 Exa 请求迁移到服务端。
+4. Exa 已由 Fastify Provider 直接读取用户设置，保存后立即生效；其他需要 daemon 的引擎仍按各自运行方式处理。
 5. 引擎元数据（官方图标、启用前置条件、颜色）由共享前端配置统一提供；首页选择器、结果来源、历史、引擎管理和统计审计使用同一个带图标的 Tag 组件。
 
 ## 安全边界

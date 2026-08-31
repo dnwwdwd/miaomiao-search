@@ -2,6 +2,9 @@
 
 | REQ ID | 标题 | 状态 | 当前阶段 | 功能进度文档 | 最近更新 | 阻塞 / 下一步 |
 |---|---|---|---|---|---|---|
+| REQ-20260831-003 | Exa MCP 使用用户数据库凭据 | 待验证 | Fastify Exa Provider、加密设置读取和 MCP 测试已完成 | `Progress/PROG-REQ-20260831-003-exa-database-credential.md` | 2026-08-31 | 完成最终 lint/typecheck/test/build 与 LPK 发布；待设备双用户凭据隔离回归。 |
+| REQ-20260831-002 | 门户下拉层、正文阅读器与凭据交互收口 | 待验证 | Dropdown 浮层、B站详情、凭据申请入口/明文切换和首页来源交互已完成 | `Progress/PROG-REQ-20260831-002-portal-interaction-and-bilibili-details.md` | 2026-08-31 | 登录后回归表格下拉定位、B站详情统计和凭据链接新窗口行为。 |
+| REQ-20260831-001 | 新增 Firecrawl、Tavily、GitHub 与 B站搜索源 | 待验证 | Provider、统一搜索链路、门户、MCP、历史快照和审计已完成 | `Progress/PROG-REQ-20260831-001-four-search-providers.md` | 2026-08-31 | 默认本地验证已通过；真实外部 API、B站在线状态和设备回归待执行。 |
 | REQ-20260829-003 | 懒猫 Resource MCP 与应用间委托调用 | 待验证 | Resource MCP 元数据、`/mcp` 双鉴权、本地自动化和 LPK 资源路径检查已完成 | `Progress/PROG-REQ-20260829-003-lazycat-resource-mcp.md` | 2026-08-29 | 在 lzcos 设备上验证小龙猫/Codex 发现和 `.lzcx` 调用。 |
 | REQ-20260828-001 | Bing 重定向与网页正文读取容错 | 待验证 | 上游补丁、正文回退、错误语义和 Playwright 生产运行时已实现 | `Progress/PROG-REQ-20260828-001-bing-and-web-content-resilience.md` | 2026-08-29 | 用真实设备验证 Bing 302、代理/TUN DIRECT 规则、Chromium 启动和动态页面正文回退。 |
 | REQ-20260827-001 | 喵喵搜索品牌、包标识符与发布包更新 | 已完成 | 品牌替换、镜像发布与 LPK 验证完成 | `Progress/PROG-REQ-20260827-001-miaomiao-brand-and-package-release.md` | 2026-08-27 | Docker Hub digest `sha256:065a27414cceab75237d28f872256449e657f9eae1f0751af9cec77326462c8e`；官方镜像 `registry.lazycat.cloud/u30387910/c1own123/lazycat:a3bea6e9c8a0614c`；设备安装回归待部署环境。 |

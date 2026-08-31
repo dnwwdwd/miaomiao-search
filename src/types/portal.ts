@@ -20,11 +20,18 @@ export type SearchEngine = {
   lastError: string;
   lastTestAt: string;
   requiresProxy: boolean;
+  /** Kept for compatibility with older portal callers; required credentials only. */
   requiresApiKey: boolean;
+  supportsApiKey: boolean;
+  apiKeyOptional: boolean;
   apiKeyConfigured: boolean;
+  credentialLabel?: string;
+  credentialPlaceholder?: string;
+  credentialUrl?: string;
+  maxResults: number;
 };
 
-export type SearchResult = { id: string; title: string; url: string; description: string; faviconUrl?: string; engines: string[] };
+export type SearchResult = { id: string; title: string; url: string; description: string; faviconUrl?: string; thumbnailUrl?: string; videoMeta?: { author?: string; duration?: string; views?: number; likes?: number; favorites?: number; comments?: number; publishedAt?: number }; engines: string[] };
 export type SearchFailure = { engine: string; code: string; message: string };
 export type SearchEngineResultGroup = { engine: string; limit: number; results: SearchResult[]; cached: boolean; failure?: SearchFailure };
 export type SearchHistory = { id: string; query: string; engines: string[]; count: number; results: SearchResult[]; engineResults: SearchEngineResultGroup[]; failures: SearchFailure[]; createdAt: string };

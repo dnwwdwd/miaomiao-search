@@ -1,5 +1,6 @@
 import { assertHttpUrlWithoutCredentials, DomainError, type Channel, type EngineId, type EngineSearchResultGroup, type FetchContent, type SearchFailure, type SearchInput, type SearchResponse, type SearchResult, type UpstreamSearchResponse } from "../domain.js";
 import type { OpenWebSearchClient } from "../upstream/open-websearch.js";
+import { createOpenWebSearchRegistry, createProviderRegistry, SearchProviderRegistry } from "../providers/registry.js";
 import { AuditService } from "./audit.js";
 import { TtlLruCache } from "./cache.js";
 import { SettingsService } from "./settings.js";
@@ -20,9 +21,14 @@ export class SearchService {
     private readonly contentCache = new TtlLruCache<FetchContent>(1_000),
     private readonly resolveEngines: EngineResolver = (engines) => engines,
     private readonly resolveEngineLimits: EngineLimitResolver = () => ({}),
+    // Keep the original three-argument constructor usable while ensuring
+    // callers that already provide per-user settings get the complete
+    // provider catalog. Callers without settings (for example isolated unit
+    // tests) retain the legacy Open-WebSearch-only fallback.
+    private readonly providers: SearchProviderRegistry = settings ? createProviderRegistry(settings, upstream) : createOpenWebSearchRegistry(upstream),
   ) {}
 
-  async search(input: SearchInput, context: { channel: Channel; saveHistory?: boolean; tokenId?: string; tokenPrefix?: string }): Promise<SearchResponse> {
+  async search(input: SearchInput, context: { channel: Channel; saveHistory?: boolean; tokenId?: string; tokenPrefix?: string; bypassCache?: boolean }): Promise<SearchResponse> {
     const resolvedInput = { ...input, engines: this.resolveEngines(input.engines, context.channel) };
     this.validateSearchInput(resolvedInput);
     const startedAt = Date.now();
@@ -34,17 +40,21 @@ export class SearchService {
       const engineResults = await mapWithConcurrency(resolvedInput.engines, concurrency, async (engine) => {
         const configuredLimit = configuredLimits[engine];
         const fallbackLimit = this.setting("search.defaultLimit", 10);
-        const limit = Math.min(input.limit ?? (configuredLimit ?? fallbackLimit), configuredLimit ?? fallbackLimit, this.setting("search.maxLimit", 50));
         const searchMode = engine === "bing" ? "request" : undefined;
-        const executionInput: SearchInput = { query: resolvedInput.query, engines: [engine], limit, searchMode };
-        const key = JSON.stringify({ query: executionInput.query, engine, limit, searchMode });
-        const searchCacheEnabled = this.setting("cache.search.enabled", true);
-        let response = searchCacheEnabled ? this.searchCache.get(key) : undefined;
-        const groupCached = Boolean(response);
+        let limit = Math.max(1, Math.min(input.limit ?? (configuredLimit ?? fallbackLimit), configuredLimit ?? fallbackLimit, this.setting("search.maxLimit", 50)));
+        let groupCached = false;
         try {
+          const provider = this.providers.get(engine);
+          limit = Math.max(1, Math.min(limit, provider.maxResults));
+          const executionInput: SearchInput = { query: resolvedInput.query, engines: [engine], limit, searchMode };
+          const key = JSON.stringify({ query: executionInput.query, engine, limit, searchMode, providerVersion: provider.cacheVersion });
+          const searchCacheEnabled = this.setting("cache.search.enabled", true);
+          let response = !context.bypassCache && searchCacheEnabled ? this.searchCache.get(key) : undefined;
+          groupCached = Boolean(response);
           if (!response) {
-            response = await this.upstream.search(executionInput);
-            if (searchCacheEnabled) this.searchCache.set(key, response, this.setting("cache.search.ttl", searchCacheTtlMs / 1_000) * 1_000, this.setting("cache.search.maxSize", 1_000));
+            const providerResponse = await provider.search({ query: executionInput.query, limit, searchMode });
+            response = { results: providerResponse.results, failures: providerResponse.failures.map((failure) => ({ ...failure, engine })) };
+            if (!context.bypassCache && searchCacheEnabled) this.searchCache.set(key, response, this.setting("cache.search.ttl", searchCacheTtlMs / 1_000) * 1_000, this.setting("cache.search.maxSize", 1_000));
           }
           const failures = response.failures.map((failure) => ({ ...failure, engine }));
           const group: EngineSearchResultGroup = {
@@ -103,6 +113,10 @@ export class SearchService {
       });
       throw domainError;
     }
+  }
+
+  clearSearchCache(): void {
+    this.searchCache.clear();
   }
 
   async fetchContent(url: string, maxChars: number, context: { channel: Channel; tokenId?: string; tokenPrefix?: string }): Promise<{ content: FetchContent; cached: boolean; requestId: string }> {
@@ -179,7 +193,7 @@ export class SearchService {
 
   private toFailure(engine: EngineId, error: unknown): SearchFailure {
     if (error instanceof DomainError) return { engine, code: error.code, message: error.message };
-    return { engine, code: "UPSTREAM_UNAVAILABLE", message: error instanceof Error ? error.message : "上游搜索失败" };
+    return { engine, code: "UPSTREAM_UNAVAILABLE", message: "上游搜索服务暂时不可用" };
   }
 
   private setting<T>(key: string, fallback: T): T {
@@ -220,6 +234,8 @@ function deduplicateResults(results: SearchResult[]): SearchResult[] {
     const existing = merged.get(key);
     if (existing) {
       existing.engines = [...new Set([...existing.engines, ...result.engines])] as EngineId[];
+      if (!existing.thumbnailUrl && result.thumbnailUrl) existing.thumbnailUrl = result.thumbnailUrl;
+      if (!existing.videoMeta && result.videoMeta) existing.videoMeta = result.videoMeta;
     } else {
       merged.set(key, { ...result, url: key, engines: [...new Set(result.engines)] as EngineId[] });
     }

@@ -20,6 +20,8 @@ import { UserStoreManager } from "../src/services/user-stores.js";
 import type { OpenWebSearchClient } from "../src/upstream/open-websearch.js";
 import { HttpOpenWebSearchClient } from "../src/upstream/open-websearch.js";
 import { buildServer } from "../src/app.js";
+import { createProviderRegistry } from "../src/providers/registry.js";
+import { engineIds } from "../src/domain.js";
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
 
@@ -48,6 +50,11 @@ class FakeUpstream implements OpenWebSearchClient {
   async fetchLinuxDoArticle(): Promise<string> { return "Linux.do article"; }
 }
 
+const rateLimitedExaFetch: typeof fetch = async () => new Response(JSON.stringify({ error: "rate limited" }), {
+  status: 429,
+  headers: { "content-type": "application/json" },
+});
+
 function setup() {
   const dir = mkdtempSync(join(tmpdir(), "miaomiao-search-"));
   const config = loadConfig({ NODE_ENV: "test", DATA_DIR: dir });
@@ -69,7 +76,7 @@ test("migration and bootstrap create default engines without a local administrat
   try {
     await bootstrapDatabase(database, config);
     await bootstrapDatabase(database, config);
-    assert.equal(count(database, "SELECT COUNT(*) AS count FROM engine"), 7);
+    assert.equal(count(database, "SELECT COUNT(*) AS count FROM engine"), 11);
     assert.equal(count(database, "SELECT COUNT(*) AS count FROM engine WHERE id = 'startpage'"), 0);
     assert.equal(count(database, "SELECT COUNT(*) AS count FROM setting"), 22);
     assert.equal(count(database, "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'local_account'"), 1);
@@ -81,14 +88,28 @@ test("migration and bootstrap create default engines without a local administrat
   }
 });
 
-test("bootstrap migrates the old engine defaults once", async () => {
+test("bootstrap preserves existing engine defaults and user settings", async () => {
   const { dir, config, database } = setup();
   try {
     await bootstrapDatabase(database, config);
     database.sqlite.prepare("UPDATE engine SET enabled = 0, is_default = 0").run();
     database.sqlite.prepare("UPDATE setting SET value = ? WHERE key = 'search.defaultEngines'").run(JSON.stringify(["bing", "duckduckgo"]));
     await bootstrapDatabase(database, config);
-    assert.deepEqual((database.sqlite.prepare("SELECT id FROM engine WHERE enabled = 1 AND is_default = 1 ORDER BY id").all() as Array<{ id: string }>).map((row) => row.id), ["baidu", "bing", "csdn", "juejin", "sogou"]);
+    assert.deepEqual((database.sqlite.prepare("SELECT id FROM engine WHERE enabled = 1 AND is_default = 1 ORDER BY id").all() as Array<{ id: string }>).map((row) => row.id), []);
+  } finally {
+    database.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("provider registry maps all eleven engines without sharing user settings", async () => {
+  const { dir, config, database } = setup();
+  try {
+    await bootstrapDatabase(database, config);
+    const registry = createProviderRegistry(new SettingsService(database, config.settingsEncryptionKey), new FakeUpstream());
+    assert.deepEqual(engineIds.map((id) => registry.get(id).engine), [...engineIds]);
+    assert.equal(registry.get("tavily").maxResults, 20);
+    assert.equal(registry.get("bilibili").maxResults, 20);
   } finally {
     database.close();
     rmSync(dir, { recursive: true, force: true });
@@ -294,16 +315,19 @@ test("search deduplicates, caches, and persists partial-success audit data", asy
   const { dir, config, database } = setup();
   try {
     const upstream = new FakeUpstream();
-    const service = new SearchService(upstream, new AuditService(database), new SettingsService(database, config.settingsEncryptionKey));
+    const settings = new SettingsService(database, config.settingsEncryptionKey);
+    settings.set("engine.exa.apiKey", "exa-test-key");
+    const service = new SearchService(upstream, new AuditService(database), settings, undefined, undefined, undefined, undefined, createProviderRegistry(settings, upstream, { fetch: rateLimitedExaFetch }));
     const input: SearchInput = { query: "lazycat", engines: ["bing", "duckduckgo", "exa"], limit: 10, searchMode: "auto" };
     const first = await service.search(input, { channel: "web" });
     const second = await service.search(input, { channel: "web" });
     assert.equal(first.results.length, 1);
     assert.deepEqual(first.results[0].engines.sort(), ["bing", "duckduckgo"]);
     assert.equal(first.engineResults.length, 3);
-    assert.equal(first.engineResults.find((group) => group.engine === "exa")?.failure?.code, "RATE_LIMITED");
-    assert.equal(second.cached, true);
-    assert.equal(upstream.searches, 3);
+    assert.equal(first.engineResults.find((group) => group.engine === "exa")?.failure?.code, "EXA_RATE_LIMITED");
+    assert.equal(second.cached, false);
+    assert.equal(second.engineResults.find((group) => group.engine === "exa")?.failure?.code, "EXA_RATE_LIMITED");
+    assert.equal(upstream.searches, 2);
     assert.ok(upstream.inputs.some((item) => item.engines[0] === "bing" && item.searchMode === "request"));
     assert.equal(count(database, "SELECT COUNT(*) AS count FROM request_log WHERE status = 'partial'"), 2);
     assert.equal(count(database, "SELECT COUNT(*) AS count FROM search_history"), 2);
@@ -604,12 +628,18 @@ test("management API authenticates a session and returns persisted portal data",
     const audit = new AuditService(database);
     const settings = new SettingsService(database, config.settingsEncryptionKey);
     const auth = oidc(config);
-    const app = buildServer(config, upstream, { database, audit, settings, auth, localAccounts: new LocalAccountService(database), tokens: new TokenService(database, config.tokenHashKey), search: new SearchService(upstream, audit, settings), rateLimiter: new SlidingWindowRateLimiter() });
+    const search = new SearchService(upstream, audit, settings, undefined, undefined, undefined, undefined, createProviderRegistry(settings, upstream, { fetch: rateLimitedExaFetch }));
+    const app = buildServer(config, upstream, { database, audit, settings, auth, localAccounts: new LocalAccountService(database), tokens: new TokenService(database, config.tokenHashKey), search, rateLimiter: new SlidingWindowRateLimiter() });
     await app.ready();
   const cookie = `miaomiao_search_session=${await auth.createSession({ id: "lazycat-user", account: "lazycat-user", name: "Lazycat User", role: "NORMAL", loginMethod: "oidc" })}`;
     const enginesResponse = await app.inject({ method: "GET", url: "/api/engines", headers: { host: "127.0.0.1", cookie: String(cookie).split(";")[0] } });
     assert.equal(enginesResponse.statusCode, 200);
-    assert.equal(enginesResponse.json().engines.length, 7);
+    assert.equal(enginesResponse.json().engines.length, 11);
+    const enginePayload = enginesResponse.json().engines as Array<Record<string, unknown>>;
+    assert.equal(enginePayload.find((engine) => engine.id === "tavily")?.maxResults, 20);
+    assert.equal(enginePayload.find((engine) => engine.id === "github")?.apiKeyOptional, true);
+    assert.equal(enginePayload.find((engine) => engine.id === "exa")?.credentialUrl, "https://dashboard.exa.ai/api-keys");
+    assert.equal(enginePayload.find((engine) => engine.id === "bilibili")?.supportsApiKey, false);
     assert.equal(enginesResponse.json().engines.find((engine: { id: string }) => engine.id === "brave"), undefined);
     const exaWithoutKey = await app.inject({ method: "PATCH", url: "/api/engines/exa", headers: { host: "127.0.0.1", cookie: String(cookie).split(";")[0] }, payload: { enabled: true } });
     assert.equal(exaWithoutKey.statusCode, 400);
@@ -621,9 +651,17 @@ test("management API authenticates a session and returns persisted portal data",
     assert.doesNotMatch(String((database.sqlite.prepare("SELECT value FROM setting WHERE key = 'engine.exa.apiKey'").get() as { value: string }).value), /exa-secret-for-test/);
     const exaEnabled = await app.inject({ method: "PATCH", url: "/api/engines/exa", headers: { host: "127.0.0.1", cookie: String(cookie).split(";")[0] }, payload: { enabled: true } });
     assert.equal(exaEnabled.statusCode, 200);
+    const githubEnabled = await app.inject({ method: "PATCH", url: "/api/engines/github", headers: { host: "127.0.0.1", cookie: String(cookie).split(";")[0] }, payload: { enabled: true } });
+    assert.equal(githubEnabled.statusCode, 200);
+    const bilibiliKey = await app.inject({ method: "PATCH", url: "/api/engines/bilibili", headers: { host: "127.0.0.1", cookie: String(cookie).split(";")[0] }, payload: { apiKey: "not-supported" } });
+    assert.equal(bilibiliKey.statusCode, 400);
+    assert.equal(bilibiliKey.json().error.code, "ENGINE_API_KEY_UNSUPPORTED");
+    const tavilyTooMany = await app.inject({ method: "PATCH", url: "/api/engines/tavily", headers: { host: "127.0.0.1", cookie: String(cookie).split(";")[0] }, payload: { resultLimit: 50 } });
+    assert.equal(tavilyTooMany.statusCode, 400);
+    assert.equal(tavilyTooMany.json().error.code, "ENGINE_RESULT_LIMIT_EXCEEDED");
     const exaTest = await app.inject({ method: "POST", url: "/api/engines/exa/test", headers: { host: "127.0.0.1", cookie: String(cookie).split(";")[0] }, payload: { query: "lazycat" } });
     assert.equal(exaTest.statusCode, 502);
-    assert.deepEqual(exaTest.json().error, { code: "RATE_LIMITED", message: "429" });
+    assert.deepEqual(exaTest.json().error, { code: "EXA_RATE_LIMITED", message: "Exa 请求过于频繁" });
     settings.delete("proxy.url");
     const duckWithTunProxy = await app.inject({ method: "PATCH", url: "/api/engines/duckduckgo", headers: { host: "127.0.0.1", cookie: String(cookie).split(";")[0] }, payload: { enabled: true } });
     assert.equal(duckWithTunProxy.statusCode, 200);

@@ -88,6 +88,16 @@ test("登录页使用无彩色边框的高保真布局", async () => {
   assert.doesNotMatch(portal, /login-panel[^\n]*border-/);
 });
 
+test("门户顶栏不再显示语言选择按钮", async () => {
+  const [shell, legacyPortal] = await Promise.all([
+    read("src/components/portal/portal-shell.tsx"),
+    read("miaomiao_search_portal.html"),
+  ]);
+  assert.doesNotMatch(shell, /语言选择|Language selector/);
+  assert.doesNotMatch(shell, /onLocaleChange/);
+  assert.doesNotMatch(legacyPortal, /Language Selector|lang-btn-(?:zh|en)/);
+});
+
 test("中英文切换覆盖登录与五个管理页面", async () => {
   const files = await Promise.all([
     read("src/components/portal/portal-app.tsx"),
@@ -249,4 +259,52 @@ test("DuckDuckGo engine tags use the stable official icon asset", async () => {
 test("Bing advanced search mode is scoped to Bing selections", async () => {
   const page = await read("src/components/portal/pages/search-page.tsx");
   assert.match(page, /active\.includes\("bing"\)/);
+});
+
+test("四类新增搜索源贯穿门户目录、封面和凭据契约", async () => {
+  const [catalog, types, api, page, styles, serverCatalog] = await Promise.all([
+    read("src/lib/engine-catalog.ts"),
+    read("src/types/portal.ts"),
+    read("src/lib/api.ts"),
+    read("src/components/portal/pages/search-page.tsx"),
+    read("app/globals.css"),
+    read("packages/server/src/engine-catalog.ts"),
+  ]);
+  for (const id of ["firecrawl", "tavily", "github", "bilibili"]) {
+    assert.match(catalog, new RegExp(`${id}:`));
+    assert.match(serverCatalog, new RegExp(`${id}:`));
+  }
+  assert.match(types, /thumbnailUrl\?: string/);
+  assert.match(types, /videoMeta\?:/);
+  assert.match(types, /apiKeyOptional: boolean/);
+  assert.match(types, /maxResults: number/);
+  assert.match(api, /thumbnailUrl\?: string/);
+  assert.match(api, /credentialPlaceholder/);
+  assert.match(api, /credentialUrl/);
+  assert.match(page, /loading="lazy"/);
+  assert.match(page, /referrerPolicy="no-referrer"/);
+  assert.match(page, /Thumbnail/);
+  assert.match(page, /Bilibili video details/);
+  assert.match(page, /setVideoResult/);
+  for (const tag of ["firecrawl", "tavily", "github", "bilibili"]) assert.match(styles, new RegExp(`engine-tag-${tag}`));
+});
+
+test("门户交互保留浮层、最后来源提示和凭据申请入口", async () => {
+  const [dropdown, page, engines, serverCatalog] = await Promise.all([
+    read("src/components/ui/dropdown.tsx"),
+    read("src/components/portal/pages/search-page.tsx"),
+    read("src/components/portal/pages/engines-page.tsx"),
+    read("packages/server/src/engine-catalog.ts"),
+  ]);
+  assert.match(dropdown, /createPortal/);
+  assert.match(dropdown, /position: "fixed"/);
+  assert.match(dropdown, /placement\?: "auto" \| "bottom"/);
+  assert.match(engines, /<Dropdown placement="bottom"/);
+  assert.doesNotMatch(engines, /B站无需密钥；公开接口可能触发平台风控/);
+  assert.doesNotMatch(engines, /公开接口.*风控/);
+  assert.match(page, /至少保留一个搜索引擎来源/);
+  assert.match(page, /rounded-xl border border-blue-300/);
+  assert.match(engines, /credentialVisible/);
+  assert.match(engines, /credentialUrl/);
+  assert.match(serverCatalog, /https:\/\/dashboard\.exa\.ai\/api-keys/);
 });

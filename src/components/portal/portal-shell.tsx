@@ -23,7 +23,7 @@ const serviceStatusTone: Record<ServiceStatus, "neutral" | "green" | "red"> = {
   offline: "red",
 };
 
-export function PortalShell({ active, onNavigate, locale, onLocaleChange, onLogout, children }: { active: PortalTab; onNavigate: (tab: PortalTab) => void; locale: Locale; onLocaleChange: (locale: Locale) => void; onLogout: () => void; children: ReactNode }) {
+export function PortalShell({ active, onNavigate, locale, onLogout, children }: { active: PortalTab; onNavigate: (tab: PortalTab) => void; locale: Locale; onLogout: () => void; children: ReactNode }) {
   const { engines, usageLogs, serviceStatus } = usePortal();
   const cacheHits = usageLogs.filter((log) => log.cacheHit).length;
   const cacheRate = usageLogs.length ? Math.round((cacheHits / usageLogs.length) * 100) : 0;
@@ -44,10 +44,6 @@ export function PortalShell({ active, onNavigate, locale, onLocaleChange, onLogo
         </div>
         <div className="flex shrink-0 items-center gap-2 md:gap-3">
           <Tag tone={serviceStatusTone[serviceStatus]} className="gap-1.5 px-2.5 py-1 text-[10px]" aria-live="polite"><span className={cn("size-1.5 rounded-full", serviceStatus === "online" ? "bg-emerald-500" : serviceStatus === "offline" ? "bg-red-500" : "bg-slate-400")} />{statusText}</Tag>
-          <div className="flex rounded-lg border border-slate-200 bg-slate-100 p-0.5" aria-label={locale === "zh" ? "语言选择" : "Language selector"}>
-            <button type="button" onClick={() => onLocaleChange("zh")} className={cn("rounded-md px-2.5 py-1 text-[11px] font-bold", locale === "zh" ? "bg-white text-blue-700 shadow-sm" : "text-slate-600")}>中文</button>
-            <button type="button" onClick={() => onLocaleChange("en")} className={cn("rounded-md px-2.5 py-1 text-[11px] font-bold", locale === "en" ? "bg-white text-blue-700 shadow-sm" : "text-slate-600")}>EN</button>
-          </div>
           <Button variant="ghost" onClick={onLogout} className="min-h-8 border border-slate-200 bg-slate-100 px-3 hover:border-red-200 hover:bg-red-50 hover:text-red-600"><Icon name="sign-out" />{locale === "zh" ? "登出" : "Logout"}</Button>
         </div>
       </header>

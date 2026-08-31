@@ -11,7 +11,7 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "test": "node --import tsx --test test/*.test.ts",
+    "test": "node --import tsx --test test/*.test.ts test/providers/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "db:migrate": "tsx src/db/cli-migrate.ts"
   },
@@ -21,6 +21,7 @@
     "@fastify/rate-limit": "^10.3.0",
     "@modelcontextprotocol/node": "^2.0.0",
     "@modelcontextprotocol/server": "^2.0.0",
+    "@octokit/rest": "^21.1.0",
     "better-sqlite3": "^12.4.6",
     "drizzle-orm": "^0.44.7",
     "fastify": "^5.6.2",

@@ -1,7 +1,7 @@
 # 喵喵搜索项目进度
 
-> 最后更新：2026-08-28
-> 当前阶段：阶段 3 基线已完成；单实例用户隔离、会话切换、本地账号、退出登录、自定义镜像和 LPK 已实现，等待懒猫设备回归。
+> 最后更新：2026-08-31
+> 当前阶段：四类新增搜索源已完成本地 Provider、门户、MCP、历史快照和审计接入；真实外部 API 与懒猫设备回归待开始。
 
 ## 当前口径
 
@@ -16,12 +16,12 @@
 | 模块 | 状态 | 当前事实 | 下一步 |
 |---|---|---|---|
 | 产品需求 | 已同步当前实现 | PRD 定义六个页面、MCP、安全、审计和中英文切换要求；已补充结果快照、永久保存、全局 Limit 与顶部品牌状态口径。 | 阶段 4 生产部署和端到端验收。 |
-| 技术设计 | 已同步当前实现 | 技术文档已区分实际 Next/Fastify/SQLite/MCP 实现与历史部署草图；已补充真实 API、历史快照和保留策略。 | Docker、懒猫微服和生产拓扑确认。 |
+| 技术设计 | 已同步当前实现 | 技术文档已区分实际 Next/Fastify/SQLite/MCP 实现与历史部署草图；已补充 Provider Registry、Exa/Firecrawl/Tavily/GitHub/B站固定外部 Endpoint、用户加密凭据、thumbnailUrl 和 B站结果边界。 | Docker、懒猫微服和生产拓扑确认。 |
 | 门户交互原型 | 已保留为历史参照 | `miaomiao_search_portal.html` 覆盖原始页面和交互说明。 | 与 JSX 门户保持需求一致。 |
 | 工程基础 | 已完成前端范围 | 根目录已有 Next.js、pnpm、TypeScript、Tailwind CSS、ESLint、生产构建和 lockfile。 | 真实服务端接入前确认项目目录和运行方式。 |
-| 服务端与数据库 | 阶段 3 基线完成；认证、结果分组和 Cloudflare Tunnel 网络边界已接入 | `packages/server` 已有 SQLite 迁移、OIDC/本地账号应用会话、管理 API、MCP Token、Streamable HTTP、设置加密、审计、历史结果快照、永久保存、按引擎搜索分组和 Open-WebSearch HTTP 适配器；入口 Host/Origin 与正文 DNS/SSRF 过滤按部署决策移除。 | 完成部署配置与真实网络回归。 |
-| Web 前端 | 阶段 3 基线完成；结果分组需求进行中 | `app/` 与 `src/components/portal/` 的登录和五个管理页面已使用 Next rewrite 调用真实 API；RadioGroup、Dropdown、Modal 已统一封装并替换页面内联控件。首页仍以平铺聚合视图为主，分组切换待完成。 | 完成首页分组/聚合切换，再做部署后的同源路径回归。 |
-| 测试与安全验证 | V1 基线已验证；Bing/正文容错自动化验证通过 | 类型检查、门户契约测试和 31 项服务端测试通过；覆盖 Bing 站内 302、代理绕过契约、结构化正文候选、422 无正文语义、任意 Tunnel Host/Origin 和 HTTP(S)/凭据边界。 | 做 Docker、Tunnel 回源、真实抓取和 MCP 客户端回归。 |
+| 服务端与数据库 | 四类 Provider 本地实现完成 | `packages/server` 已有 SQLite 迁移、OIDC/本地账号应用会话、管理 API、MCP Token、Streamable HTTP、设置加密、审计、历史结果快照、永久保存、按引擎搜索分组、Provider Registry、固定 REST/Octokit/B站适配和 Open-WebSearch HTTP 适配器；入口 Host/Origin 与正文 DNS/SSRF 过滤按部署决策移除。 | 完成部署配置与真实网络回归。 |
+| Web 前端 | 新引擎与封面接入完成 | `app/` 与 `src/components/portal/` 的登录和五个管理页面已使用 Next rewrite 调用真实 API；首页支持 11 个目录引擎、按 Provider 上限过滤数量、B站封面 lazy/no-referrer/fallback、凭据模式和中英文错误提示。 | 做浏览器端真实 API、响应式封面和部署后的同源路径回归。 |
+| 测试与安全验证 | 默认本地验证通过 | 服务端 Provider 与 MCP 凭据注入测试、门户契约、HTTP 响应上限、B站 412 重试与封面校验、GitHub Token 重建、缓存和健康状态均有覆盖；全量命令结果在本轮交付记录。 | 做 Docker、Tunnel 回源、真实抓取和 MCP 客户端回归。 |
 | Docker 与懒猫微服 | 自定义 amd64 镜像与轻量 LPK 已发布，含 Chromium/Playwright 运行时，设备回归待执行 | `Dockerfile` 生成 web/API/daemon 运行镜像并安装 Chromium；API 生产依赖包含 `playwright-core`；LPK 内容目录只保留说明文件；清单放行认证入口、注入浏览器路径并挂载 SQLite 数据。 | 在懒猫设备完成 OIDC、本地账号、改密、退出登录、MCP 和动态正文回归。 |
 
 ## 当前里程碑
@@ -33,6 +33,8 @@
 - 2026-08-28：修复 Bing `www` 到 `cn` 的 302，Bing request 绕过显式代理；通用正文增加结构化数据和浏览器回退，无正文统一为 422 `CONTENT_NOT_EXTRACTED`，门户增加重试与打开源站。
 - 2026-08-29：补齐正文浏览器回退的生产运行时：加入 `playwright-core`、镜像安装 Chromium、LPK 注入 `/usr/bin/chromium`，并验证 root 容器可执行 JS 空壳页面提取。
 - 2026-08-29：完成正文阅读器骨架屏/链接新窗口/引擎来源 Tag、前端错误摘要与详情展开、首页/MCP 引擎顺序拖拽持久化和桌面 90% 宽度调整；待登录后的浏览器与 MCP 顺序回归。
+- 2026-08-31：完成 Firecrawl、Tavily、GitHub、B站 Provider Registry、统一 HTTP 安全边界、用户凭据加密、11 引擎目录、Provider 上限、B站视频封面和 412 匿名预热重试；门户、MCP、历史快照、审计、错误本地化和 Provider 单测已同步。
+- 2026-08-31：修复表格内 Dropdown 被滚动容器裁剪并强制末行向下展开，正文阅读器内容区补圆角；B站搜索结果增加视频元数据详情弹窗并隐藏正文复制按钮；凭据弹窗增加官网申请入口和明文/脱敏切换，首页最后来源与引擎管理凭据 Tag 增加交互提示；Exa 改为从当前用户加密数据库设置读取并补充 MCP 测试；待登录后的浏览器视觉回归。
 
 - 2026-08-24：搜索历史已扩展为关键词、引擎选择和结果快照，历史详情支持查看旧结果与再次搜索；`-1` 表示永久保存；首页按原型视觉语言完成工作区层级优化。
 - 2026-08-24：完成顶部应用品牌与服务状态 Tag、MCP 模板换行、页面说明收敛和统计审计多维度布局；同步 PRD、技术实现、业务流程及需求/决策/进度台账。
@@ -55,10 +57,10 @@
 
 - 已使用 `SEARCH_MODE=request`、`USE_PROXY=true`、`PROXY_URL=http://127.0.0.1:7890` 启动固定版本 Open-WebSearch daemon，并对九个搜索引擎分别请求 `OpenAI`、`limit=3`。
 - Bing、Baidu、DuckDuckGo、CSDN、Juejin 的真实上游回归曾返回 3 条；Exa 通过官方 API Key 路径单独校验。Brave 已从 miaomiao-search 可用引擎中移除。
-- Exa 的无密钥网页接口仍返回 HTTP 500；补丁已支持 `EXA_API_KEY` 官方 API 路径，并将无密钥失败映射为 `engine_error`。Startpage/Sogou 的反爬页属于上游限制，不实现绕过。
+- Exa 现由 Fastify Provider 直接调用官方 Search API，从当前用户加密设置读取 Key；不再使用 daemon 的 `EXA_API_KEY` 环境变量。Startpage/Sogou 的反爬页属于上游限制，不实现绕过。
 - `pnpm test`、`pnpm typecheck`、`pnpm build` 通过；`pnpm lint` 无错误，忽略 pnpm 临时补丁编辑目录后无警告。
 
 ## 文档同步边界
 
-- `docs/UI_GUIDE.md` 已包含当前顶部状态、历史快照、永久保存、模板换行和统计维度口径，并补充 REQ-20260824-007 的分组视图实现边界。
+- `docs/UI_GUIDE.md` 已包含当前顶部状态、历史快照、永久保存、模板换行和统计维度口径，并补充四类 Provider 凭据模式、封面卡片、数量上限和错误文案边界。
 - `README.md` 已同步 Cloudflare Tunnel 入口和出站网络边界；Docker、懒猫微服和生产回归仍需部署环境验证。

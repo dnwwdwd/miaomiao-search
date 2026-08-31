@@ -3,7 +3,10 @@ import { eq } from "drizzle-orm";
 import type { AppDatabase } from "../db/client.js";
 import { settings } from "../db/schema.js";
 
-const sensitiveKeys = new Set(["proxy.url", "engine.exa.apiKey"]);
+import { engineApiKeySetting, engineCatalog } from "../engine-catalog.js";
+import { engineIds } from "../domain.js";
+
+const sensitiveKeys = new Set(["proxy.url", ...engineIds.filter((id) => engineCatalog[id].credentialMode !== "none").map(engineApiKeySetting)]);
 
 export class SettingsService {
   constructor(private readonly database: AppDatabase, private readonly encryptionKey: Buffer) {}

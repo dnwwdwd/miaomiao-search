@@ -34,10 +34,15 @@ export function createMcpServer(dependencies: { search: SearchService; settings:
 
   if (enabled.search) {
     const enabledEngineIds = currentEnabledEngineIds(dependencies.getEnabledEngines());
-    const engineEnum = z.enum(enabledEngineIds);
+    const engineEnum = enabledEngineIds.length ? z.enum(enabledEngineIds as [EngineId, ...EngineId[]]) : z.never();
+    const engineSelection = enabledEngineIds.length
+      ? z.array(engineEnum).min(1).max(enabledEngineIds.length).optional()
+      : z.array(engineEnum).max(0).optional();
     server.registerTool("search", {
-      title: "Multi-engine search", description: `Search with currently enabled public web engines: ${enabledEngineIds.join(", ")}. Omit engines to use the current default set.`,
-      inputSchema: z.object({ query: z.string().min(1).max(500), engines: z.array(engineEnum).min(1).max(enabledEngineIds.length).optional(), limit: z.number().int().min(1).max(50).optional(), searchMode: z.enum(["auto", "request"]).optional() }),
+      title: "Multi-engine search", description: enabledEngineIds.length
+        ? `Search with currently enabled search sources: ${enabledEngineIds.join(", ")}. Omit engines to use the current MCP order.`
+        : "No search source is currently enabled. Enable at least one source before calling search.",
+      inputSchema: z.object({ query: z.string().min(1).max(500), engines: engineSelection, limit: z.number().int().min(1).max(50).optional(), searchMode: z.enum(["auto", "request"]).optional() }),
     }, async ({ query, engines, limit, searchMode }) => {
       const release = dependencies.authorization.ensureScope("search");
       try {
@@ -68,7 +73,7 @@ export function createMcpServer(dependencies: { search: SearchService; settings:
   return server;
 }
 
-function currentEnabledEngineIds(value: EngineId[]): [EngineId, ...EngineId[]] {
+function currentEnabledEngineIds(value: EngineId[]): EngineId[] {
   const enabled = [...new Set(value.filter((id): id is EngineId => engineIds.includes(id)))];
-  return (enabled.length ? enabled : [engineIds[0]]) as [EngineId, ...EngineId[]];
+  return enabled;
 }

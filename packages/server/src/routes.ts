@@ -117,7 +117,7 @@ function portalContext(request: FastifyRequest): PortalContext {
 
 function assertEngineReady(id: keyof typeof engineCatalog, settings: SettingsService): void {
   const requirement = engineCatalog[id];
-  if (requirement.requiresApiKey && !(settings.get<string>(engineApiKeySetting(id)) ?? "").trim()) {
+  if (requirement.credentialMode === "required" && !(settings.get<string>(engineApiKeySetting(id)) ?? "").trim()) {
     throw new DomainError("ENGINE_API_KEY_REQUIRED", `${id} 启用前需要先配置 API Key`);
   }
 }
@@ -129,8 +129,14 @@ function engineResponse(id: string, row: typeof engines.$inferSelect, settings: 
   return {
     ...row,
     requiresProxy: requirement.requiresProxy,
-    requiresApiKey: requirement.requiresApiKey,
-    apiKeyConfigured: requirement.requiresApiKey ? Boolean(settings.get<string>(engineApiKeySetting(catalogId))) : false,
+    requiresApiKey: requirement.credentialMode === "required",
+    supportsApiKey: requirement.credentialMode !== "none",
+    apiKeyOptional: requirement.credentialMode === "optional",
+    apiKeyConfigured: requirement.credentialMode !== "none" ? Boolean(settings.get<string>(engineApiKeySetting(catalogId))?.trim()) : false,
+    credentialLabel: requirement.credentialLabel,
+    credentialPlaceholder: requirement.credentialPlaceholder,
+    credentialUrl: requirement.credentialUrl,
+    maxResults: requirement.maxResults,
   };
 }
 
@@ -223,14 +229,11 @@ export function registerAdminRoutes(app: FastifyInstance, config: ServerConfig, 
       if (id === "bing" && patch.searchMode === "auto") throw new DomainError("BING_MODE_UNSAFE", "V1 只允许 Bing 使用 request 模式");
       const current = context.store.database.orm.select().from(engines).where(eq(engines.id, id)).get();
       if (!current) throw new DomainError("ENGINE_NOT_FOUND", "搜索引擎不存在", 404);
-      if (patch.apiKey !== undefined) {
-        if (!engineCatalog[id].requiresApiKey) throw new DomainError("ENGINE_API_KEY_UNSUPPORTED", "该搜索引擎不支持 API Key 配置");
-        if (patch.apiKey === null || !patch.apiKey.trim()) context.store.settings.delete(engineApiKeySetting(id));
-        else context.store.settings.set(engineApiKeySetting(id), patch.apiKey.trim());
-      }
+      if (patch.resultLimit !== undefined && patch.resultLimit !== null && patch.resultLimit > engineCatalog[id].maxResults) throw new DomainError("ENGINE_RESULT_LIMIT_EXCEEDED", `该搜索引擎最多返回 ${engineCatalog[id].maxResults} 条结果`);
       const nextEnabled = patch.enabled ?? current.enabled;
       const nextDefault = patch.isDefault ?? current.isDefault;
-      if (patch.enabled === true) assertEngineReady(id, context.store.settings);
+      const nextApiKey = patch.apiKey === undefined ? context.store.settings.get<string>(engineApiKeySetting(id)) : patch.apiKey?.trim() || undefined;
+      if (nextEnabled && engineCatalog[id].credentialMode === "required" && !nextApiKey) throw new DomainError("ENGINE_API_KEY_REQUIRED", `${id} 启用前需要先配置 API Key`);
       if (nextDefault && !nextEnabled) throw new DomainError("DEFAULT_ENGINE_DISABLED", "默认搜索引擎必须处于启用状态");
       if (current.isDefault && !nextDefault) {
         const otherDefault = context.store.database.orm.select().from(engines).all().some((engine) => engine.id !== id && engine.enabled && engine.isDefault);
@@ -239,6 +242,12 @@ export function registerAdminRoutes(app: FastifyInstance, config: ServerConfig, 
       if (current.isDefault && !nextEnabled) {
         const otherDefault = context.store.database.orm.select().from(engines).all().some((engine) => engine.id !== id && engine.enabled && engine.isDefault);
         if (!otherDefault) throw new DomainError("DEFAULT_ENGINE_REQUIRED", "至少需要保留一个默认搜索引擎");
+      }
+      if (patch.apiKey !== undefined) {
+        if (engineCatalog[id].credentialMode === "none") throw new DomainError("ENGINE_API_KEY_UNSUPPORTED", "该搜索引擎不支持 API Key 配置");
+        if (nextApiKey) context.store.settings.set(engineApiKeySetting(id), nextApiKey);
+        else context.store.settings.delete(engineApiKeySetting(id));
+        context.store.search.clearSearchCache();
       }
       const enginePatch = { ...patch };
       delete enginePatch.apiKey;
@@ -254,12 +263,21 @@ export function registerAdminRoutes(app: FastifyInstance, config: ServerConfig, 
       const engine = context.store.database.orm.select().from(engines).where(eq(engines.id, id)).get();
       if (!engine) throw new DomainError("ENGINE_NOT_FOUND", "搜索引擎不存在", 404);
       const startedAt = Date.now();
-      if (!engine.enabled) throw new DomainError("ENGINE_DISABLED", "搜索引擎已停用");
-      assertEngineReady(id, context.store.settings);
-      const result = await context.store.search.search({ query: z.object({ query: z.string().min(1).max(500).default("lazycat search") }).parse(request.body).query, engines: [id], searchMode: id === "bing" ? "request" : undefined }, { channel: "web", saveHistory: false });
-      const latencyMs = Date.now() - startedAt;
-      context.store.database.orm.update(engines).set({ lastTestAt: new Date().toISOString(), status: result.failures.length ? "degraded" : "healthy", latencyMs, lastError: result.failures[0]?.message ?? null, updatedAt: new Date().toISOString() }).where(eq(engines.id, id)).run();
-      return { resultCount: result.results.length, latencyMs, ...(result.failures[0] ? { failure: { code: result.failures[0].code, message: result.failures[0].message } } : {}), engine: engineResponse(id, context.store.database.orm.select().from(engines).where(eq(engines.id, id)).get()!, context.store.settings) };
+      const testQuery = z.object({ query: z.string().min(1).max(500).default("lazycat search") }).parse(request.body).query;
+      try {
+        if (!engine.enabled) throw new DomainError("ENGINE_DISABLED", "搜索引擎已停用");
+        assertEngineReady(id, context.store.settings);
+        const result = await context.store.search.search({ query: testQuery, engines: [id], searchMode: id === "bing" ? "request" : undefined }, { channel: "web", saveHistory: false, bypassCache: true });
+        const latencyMs = Date.now() - startedAt;
+        const firstFailure = result.failures[0];
+        context.store.database.orm.update(engines).set({ lastTestAt: new Date().toISOString(), status: firstFailure ? healthStatusForFailure(firstFailure.code) : "healthy", latencyMs, lastError: firstFailure?.message ?? null, updatedAt: new Date().toISOString() }).where(eq(engines.id, id)).run();
+        return { resultCount: result.results.length, latencyMs, ...(result.failures[0] ? { failure: { code: result.failures[0].code, message: result.failures[0].message } } : {}), engine: engineResponse(id, context.store.database.orm.select().from(engines).where(eq(engines.id, id)).get()!, context.store.settings) };
+      } catch (error) {
+        const failure = error instanceof DomainError ? error : new DomainError("UPSTREAM_UNAVAILABLE", "上游搜索服务暂时不可用", 502);
+        const status = failure.code === "ENGINE_DISABLED" ? "disabled" : healthStatusForFailure(failure.code);
+        context.store.database.orm.update(engines).set({ lastTestAt: new Date().toISOString(), status, latencyMs: Date.now() - startedAt, lastError: failure.message, updatedAt: new Date().toISOString() }).where(eq(engines.id, id)).run();
+        throw failure;
+      }
     } catch (error) { const response = errorBody(error); return reply.code(response.status).send(response.body); }
   });
 
@@ -293,6 +311,13 @@ export function registerAdminRoutes(app: FastifyInstance, config: ServerConfig, 
   app.put("/api/mcp/tools", { preHandler: portalUser }, async (request, reply) => {
     try { const context = portalContext(request); const tools = z.record(z.enum(mcpTools.map((tool) => tool.name) as [string, ...string[]]), z.boolean()).parse(request.body); context.store.settings.set("mcp.tools", { ...getMcpTools(context.store.settings), ...tools }); return { tools: mcpTools.map((tool) => ({ ...tool, enabled: getMcpTools(context.store.settings)[tool.name] })) }; } catch (error) { const response = errorBody(error); return reply.code(response.status).send(response.body); }
   });
+}
+
+function healthStatusForFailure(code: string): "rate_limited" | "blocked" | "unavailable" | "degraded" {
+  if (code.endsWith("RATE_LIMITED") || code === "RATE_LIMITED") return "rate_limited";
+  if (code === "BILIBILI_BLOCKED") return "blocked";
+  if (code === "UPSTREAM_TIMEOUT" || code === "UPSTREAM_UNAVAILABLE") return "unavailable";
+  return "degraded";
 }
 
 function readSettings(settings: SettingsService) {

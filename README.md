@@ -6,7 +6,8 @@
 
 ## 功能
 
-- 聚合 Bing、Baidu、DuckDuckGo 等搜索源，并记录部分失败信息。
+- 聚合 11 个搜索源：Bing、Baidu、DuckDuckGo、Exa、CSDN、Juejin、Sogou、Firecrawl、Tavily、GitHub 和 B站，并记录部分失败信息。
+- Firecrawl/Tavily 使用用户加密 API Key；GitHub 支持可选 Token 的公共仓库搜索；B站通过公开接口搜索视频并返回经校验的官方 CDN 封面 URL。四个新增源首次启用时默认关闭。
 - 读取网页正文；正文目标允许应用运行环境可达的任意 HTTP(S) 地址，保留 URL 格式、无凭据、超时、响应体大小和正文长度限制。
 - 管理搜索引擎、缓存、限流、历史记录和审计日志。
 - 通过 Streamable HTTP 暴露 MCP Tools；外部客户端使用 Access Token，懒猫小龙猫、Codex 等应用间 Agent 可通过 Resource MCP 委托访问。
@@ -45,6 +46,8 @@ export OIDC_USERINFO_URI='https://oidc.example.com/userinfo'
 export OPEN_WEBSEARCH_URL=http://127.0.0.1:3210
 ```
 
+Exa、Firecrawl、Tavily 和 GitHub 的凭据在门户“引擎管理”中按用户保存，服务端只在当前用户数据库中保存加密值；Exa MCP/Web 请求直接读取该设置，不依赖 `EXA_API_KEY` 环境变量。B站不需要 Key，也不读取登录态。B站公开接口可能触发 412，服务端只做一次匿名首页 Cookie 预热和一次重试，不保存 Cookie。不要把这些凭据写入仓库或提交到 `.env`。
+
 在另一个终端启动服务端：
 
 ```bash
@@ -57,8 +60,6 @@ pnpm server:dev
 $env:SEARCH_MODE="request"
 $env:USE_PROXY="true"
 $env:PROXY_URL="http://127.0.0.1:7890"
-# Optional: Exa's official Search API requires an API key; keep it in this terminal only.
-# $env:EXA_API_KEY="请替换为 Exa API Key"
 pnpm --filter @miaomiao-search/server exec open-websearch serve --port 3210
 ```
 
@@ -81,6 +82,7 @@ pnpm dev
 ```bash
 pnpm lint
 pnpm typecheck
+pnpm --filter @miaomiao-search/server typecheck
 pnpm test
 pnpm build
 ```
@@ -89,8 +91,8 @@ pnpm build
 
 ```bash
 ./lzc/build-image.sh
-lzc-cli project release -o release/miaomiao-search-0.1.1.lpk
-lzc-cli lpk lint release/miaomiao-search-0.1.1.lpk
+lzc-cli project release -o release/miaomiao-search-0.1.2.lpk
+lzc-cli lpk lint release/miaomiao-search-0.1.2.lpk
 ```
 
 `lzc/build-image.sh` 将镜像推送到 `docker.io/c1own123/lazycat:miaomiao-search-<version>-amd64`，再调用 `lzc-cli appstore copy-image --arch amd64` 并把官方地址写入 `lzc-manifest.yml`。LPK 内容目录只保留说明文件，web/API/daemon 运行文件来自镜像。当前发布包目标为 Linux x86-64；API 容器启动时会在 Fastify 前启动 Open-WebSearch daemon，并等待 `/health` 就绪。

@@ -1,12 +1,12 @@
 # Miaomiao Search PRD
 
-> 项目名：miaomiao-search 基础项目：Open-WebSearch 文档版本：v0.5；实现同步：2026-08-24
+> 项目名：miaomiao-search 基础项目：Open-WebSearch 文档版本：v0.6；实现同步：2026-08-31
 
 ## 1. 项目背景
 
 Open-WebSearch 已具备多搜索引擎联网搜索、网页正文抓取、MCP Server、CLI、本地 HTTP daemon 等能力，默认不依赖第三方 Search API Key。
 
-当前上游支持 Bing、Baidu、DuckDuckGo、Exa、CSDN、掘金、搜狗等搜索源；MCP 侧暴露 `search`、`fetchWebContent`、`fetchCsdnArticle`、`fetchJuejinArticle`、`fetchGithubReadme`、`fetchLinuxDoArticle` 等工具。
+当前目录支持 11 个搜索源：Bing、Baidu、DuckDuckGo、Exa、CSDN、掘金、搜狗、Firecrawl、Tavily、GitHub 和 B站。MCP 继续暴露统一的 `search`、`fetchWebContent`、`fetchCsdnArticle`、`fetchJuejinArticle`、`fetchGithubReadme`、`fetchLinuxDoArticle` Tool。
 
 miaomiao-search 在 Open-WebSearch 基础上增加 Web 产品层和远程 MCP 服务层，形成一个既能由人直接使用，也能供外部 Agent 调用的自托管联网搜索服务。
 
@@ -46,10 +46,10 @@ V1 共 6 个页面：Login + 5 个功能页面。登录账户按现有角色访�
 | 组件 | 说明 |
 | --- | --- |
 | 搜索输入框 | 文本输入；Enter 提交；空输入禁止提交；搜索中禁止重复提交；输入为完整 URL 时提示"读取正文" |
-| 引擎选择器 | 多选；可选：Bing、Baidu、DuckDuckGo、Exa、CSDN、Juejin、Sogou；已禁用引擎不可选；记住浏览器最近选择；支持"一键恢复默认"。DuckDuckGo 启用时提示确认 TUN/VPN 代理；Exa 的 API Key 由服务端校验。Linux.do 上游标记暂不可用，默认不展示 |
-| 搜索数量选择 | 首页默认使用引擎默认值；5 / 10 / 20 / 30 / 50 仅作为本次请求临时上限且不写回配置。每个引擎受自身 `result_limit` 约束，未配置时使用搜索默认值 10 |
+| 引擎选择器 | 多选；可选 11 个目录引擎；已禁用引擎不可选；记住浏览器最近选择；支持"一键恢复默认"。DuckDuckGo 启用时提示确认 TUN/VPN 代理；Firecrawl/Tavily 启用前需要 Key，GitHub Token 可选，B站无需密钥。Linux.do 上游标记暂不可用，默认不展示 |
+| 搜索数量选择 | 首页默认使用引擎默认值；5 / 10 / 20 / 30 / 50 按当前选中引擎的最小 `maxResults` 过滤，仅作为本次请求临时上限且不写回配置。每个引擎受自身 `result_limit` 和 Provider 上限约束，未配置时使用搜索默认值 10 |
 | 高级选项折叠区 | Bing Search Mode（Auto / Request），仅选中 Bing 时显示，默认使用系统配置 |
-| 搜索结果列表 | 默认展示按引擎分组的结果和每组状态；可切换聚合视图。聚合视图按 canonical URL 去重并合并来源显示（如 `Bing · DuckDuckGo`）；两种视图均支持打开原网页、读取正文 |
+| 搜索结果列表 | 默认展示按引擎分组的结果和每组状态；可切换聚合视图。聚合视图按 canonical URL 去重并合并来源显示（如 `Bing · DuckDuckGo`）；结果可选显示约 16:9 封面，图片 lazy loading、no-referrer，失败时回退 favicon/图标；普通结果支持读取正文，B站视频点击后打开视频详情（封面、作者、播放、点赞、收藏、评论、时长和发布时间），详情只提供打开源站 |
 | 部分失败横幅 | 多引擎搜索允许部分成功；显示失败引擎及原因；单引擎失败不导致整体失败 |
 | 空结果 / 错误状态 | 区分：搜索成功但无结果、所有搜索源均失败、网络超时、被搜索引擎限制、代理异常、搜索运行时启动失败 |
 | 正文阅读面板 | 点击"读取正文"展开；显示：标题、原始 URL、最终跳转 URL、Content-Type、是否截断、正文内容；操作：复制正文、打开源站。正文最大字符数由服务端设置。失败时区分：URL/协议无效、带凭据 URL、TLS 错误、无法提取正文、超时、响应过大、站点拒绝 |
@@ -76,9 +76,10 @@ MCP 服务管理和外部 Agent 接入。
 
 | 组件 | 说明 |
 | --- | --- |
-| 引擎列表 | 每行：名称、Enabled 开关、是否默认、Search Mode、最近测试时间、状态徽标、延迟、最近错误；支持分别调整首页和 MCP 默认搜索顺序并持久化 |
+| 引擎列表 | 每行：名称、Enabled 开关、是否默认、Search Mode、每次返回数量、凭据模式、最近测试时间、状态徽标、延迟、最近错误；支持分别调整首页和 MCP 默认搜索顺序并持久化 |
 | 状态枚举 | Healthy / Degraded / Rate Limited / Blocked / Unavailable / Disabled / Unknown |
-| 测试搜索 | 固定或自定义关键词；测试不进入搜索历史，计入运行指标 |
+| 凭据模式 | Exa/Firecrawl/Tavily 必需 API Key；GitHub Token 可选且仅搜索公共仓库；B站无需密钥；四类凭据按用户加密保存并立即生效 |
+| 测试搜索 | 固定或自定义关键词；测试绕过搜索缓存，不进入搜索历史，成功或失败都记录最近测试时间、延迟、错误和健康状态 |
 
 ### 3.5 Usage
 
@@ -88,7 +89,7 @@ MCP 服务管理和外部 Agent 接入。
 | --- | --- |
 | 概览指标 | Web / MCP 调用量、成功率、缓存命中率、平均响应时间；支持小时节奏、结果状态和流量来源维度 |
 | 各引擎统计 | 按引擎维度的调用量、成功率和结果贡献 |
-| 引擎结果数量 | 引擎管理支持配置每个引擎的结果数量（1–50，可清空使用搜索默认值 10）；配置变化影响该引擎缓存键 |
+| 引擎结果数量 | 引擎管理支持配置每个引擎的结果数量（1–Provider `maxResults`，可清空使用搜索默认值 10）；配置变化影响该引擎缓存键 |
 | 操作维度 | 按 operation、channel、状态和引擎组合筛选审计日志 |
 | 请求日志表 | 每行：Request ID、channel（web / mcp）、operation、tokenId、engines、latency、cacheHit、resultCount、status、errorCode、createdAt。Query 是否写入长期日志由管理员配置 |
 
@@ -110,7 +111,7 @@ MCP 服务管理和外部 Agent 接入。
 | 组件 | 说明 |
 | --- | --- |
 | 侧边导航栏 | Search、MCP、Engines、Usage、Settings 五个一级入口；当前页面高亮 |
-| 顶栏 | 应用名“喵喵搜索 / Miaomiao Search”、服务状态 Tag、中文/英文切换、登出；不展示项目版本说明或管理员标签 |
+| 顶栏 | 应用名“喵喵搜索 / Miaomiao Search”、服务状态 Tag、登出；不展示语言选择、项目版本说明或管理员标签 |
 
 ## 5. MCP 协议
 
@@ -134,6 +135,8 @@ V1 保持 Open-WebSearch Tool 语义：
 | `fetchLinuxDoArticle` | url |
 
 `search` 返回 `engineResults[]`（按引擎的实际数量、结果、缓存和失败信息）、`resultCount`、`failures`、`cached`、`requestId`，并保留去重聚合的平铺 `results`，不能破坏原有调用方。
+
+结果项可带 `thumbnailUrl` 与 `videoMeta`。B站结果点击后展示封面、作者、播放、点赞、收藏、评论、时长和发布时间等可用视频信息，不读取网页正文；服务端不下载、不代理、不存储图片，旧历史快照缺少这些字段时照常展示。
 
 站点专用 fetch Tool 可由管理员单独启停。
 

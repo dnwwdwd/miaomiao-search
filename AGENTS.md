@@ -32,8 +32,7 @@ $env:SEARCH_MODE = "request"
 # 如果需要通过本机代理访问外网，再打开下面两项
 # $env:USE_PROXY = "true"
 # $env:PROXY_URL = "http://127.0.0.1:7890"
-# Exa 官方 Search API 需要密钥；如启用，只在当前终端设置，不要写入仓库
-# $env:EXA_API_KEY = "请替换为 Exa API Key"
+# Exa API Key 在门户“引擎管理”按用户保存，不再通过 daemon 环境变量配置
 pnpm --filter @miaomiao-search/server exec open-websearch serve --port 3210
 ```
 

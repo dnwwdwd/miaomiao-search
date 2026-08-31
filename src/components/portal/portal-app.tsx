@@ -71,7 +71,7 @@ function LoginScreen({ onLogin }: { onLogin: (user: PortalUser) => Promise<void>
 }
 
 function PortalWorkspace({ loginOnly = false }: { loginOnly?: boolean }) {
-  const { locale, setLocale, toast, refresh, setUser } = usePortal();
+  const { locale, toast, refresh, setUser } = usePortal();
   const [active, setActive] = useState<PortalTab>("search");
   const [loggedIn, setLoggedIn] = useState(false);
   const [checking, setChecking] = useState(!loginOnly);
@@ -130,7 +130,7 @@ function PortalWorkspace({ loginOnly = false }: { loginOnly?: boolean }) {
   if (checking) return <main className="grid min-h-screen place-items-center text-sm font-bold text-slate-500">{locale === "zh" ? "喵喵搜索" : "Miaomiao Search"}</main>;
   if (!loggedIn) return <LoginScreen onLogin={async (user) => { setUser(user); await refresh(); setLoggedIn(true); }} />;
   const pages = { search: <SearchPage />, mcp: <McpPage />, engines: <EnginesPage />, usage: <UsagePage />, settings: <SettingsPage /> };
-  return <><PortalShell active={active} onNavigate={setActive} locale={locale} onLocaleChange={setLocale} onLogout={() => void logout()}>{pages[active]}</PortalShell>{toast ? <Toast {...toast} /> : null}</>;
+  return <><PortalShell active={active} onNavigate={setActive} locale={locale} onLogout={() => void logout()}>{pages[active]}</PortalShell>{toast ? <Toast {...toast} /> : null}</>;
 }
 
 export function PortalApp({ loginOnly = false }: { loginOnly?: boolean }) { return <PortalProvider><PortalWorkspace loginOnly={loginOnly} /></PortalProvider>; }

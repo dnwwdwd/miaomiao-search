@@ -21,7 +21,7 @@ export function Modal({ title, children, onClose, footer, className, bodyClassNa
 
   const trapFocus = (event: ReactKeyboardEvent<HTMLElement>) => {
     if (event.key !== "Tab") return;
-    const focusable = [...(dialogRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? [])].filter((item) => !item.hasAttribute("hidden"));
+    const focusable = [...(dialogRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? []), ...document.querySelectorAll<HTMLElement>('[data-dropdown-menu="true"] button:not([disabled])')].filter((item) => !item.hasAttribute("hidden"));
     if (!focusable.length) { event.preventDefault(); return; }
     const first = focusable[0]; const last = focusable[focusable.length - 1];
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }

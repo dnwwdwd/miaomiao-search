@@ -2,6 +2,9 @@
 
 | ID | 日期 | 标题 | 状态 | 关联需求 | 用户确认 | 记录位置 |
 |---|---|---|---|---|---|---|
+| DEC-20260831-003 | 2026-08-31 | Exa 凭据从用户数据库读取 | 已确认实施 | REQ-20260831-003 | Exa Web/MCP 请求改为读取当前用户加密设置，不再依赖 daemon 环境变量；补充注入式 Provider/MCP 测试。 | `Decisions/DEC-20260831-003-exa-database-credential.md` |
+| DEC-20260831-002 | 2026-08-31 | 门户浮层、凭据入口与 B 站详情展示 | 已确认实施 | REQ-20260831-002 | 用户要求修复表格下拉遮挡、收口正文弹窗、为 B 站使用视频详情展示、补充凭据官网入口和首页来源交互提示。 | `Decisions/DEC-20260831-002-portal-interaction-and-bilibili-details.md` |
+| DEC-20260831-001 | 2026-08-31 | 四类搜索源的 Provider、凭据与 B站封面方案 | 已确认实施 | REQ-20260831-001 | Firecrawl/Tavily REST、GitHub Octokit、B站公开 Web API；封面只返回官方 CDN URL；Registry 按用户创建；不重置旧设置。 | `Decisions/DEC-20260831-001-four-search-providers.md` |
 | DEC-20260829-003 | 2026-08-29 | 懒猫 Resource MCP 与应用间委托鉴权 | 已实施，待设备验证 | REQ-20260829-003 | 保留 Bearer Token，新增仅 `X-HC-SOURCE=app:<包名>` + `X-HC-USER-ID` 的委托分支；LPK 导出 `mcp-providers/miaomiao-search`。 | `Decisions/DEC-20260829-003-lazycat-resource-mcp.md` |
 | DEC-20260829-001 | 2026-08-29 | JS 正文抓取的 Playwright 运行时 | 已实施，待设备验证 | REQ-20260828-001 | 用户指出浏览器回退缺少生产依赖并要求补齐；本轮补充 Playwright 客户端、Chromium 镜像层和 LPK 环境配置。 | `Decisions/DEC-20260829-001-playwright-runtime.md` |
 | DEC-20260829-002 | 2026-08-29 | 门户正文阅读器与引擎顺序持久化 | 已确认实施 | REQ-20260829-002 | 用户确认正文弹窗、错误本地化、首页/MCP 顺序拖拽和桌面宽度调整；顺序使用现有 Settings JSON 持久化。 | `Decisions/DEC-20260829-002-portal-reader-engine-order.md` |
@@ -16,9 +19,9 @@
 | DEC-20260825-009 | 2026-08-25 | MCP 动态引擎与专用正文上游 | 已实施 | REQ-20260825-012 | 2026-08-25：按用户测试反馈，让 MCP 搜索跟随引擎管理启用状态，专用正文 Tool 使用对应 daemon endpoint，并保留具体错误。 | `Decisions/DEC-20260825-009-mcp-dynamic-tools-and-upstream-fetch.md` |
 | DEC-20260825-006 | 2026-08-25 | LPK 多实例、OIDC 与数据库挂载 | 已确认实施 | REQ-20260825-006 | 2026-08-25：多实例空数据库挂载、OIDC 点击授权、仅 `/mcp` 网关放行、MCP Token 与懒猫账户隔离。 | `Decisions/DEC-20260825-006-lpk-oidc-multi-instance.md` |
 | DEC-20260825-005 | 2026-08-25 | 调用统计与审计日志时间范围查询 | 已确认实施 | REQ-20260825-005 | 复用 request_log 与现有索引，服务端完成范围聚合、JSON 引擎筛选、P95 和分页；不新增表。 | `Decisions/DEC-20260825-005-usage-time-range-audit.md` |
-| DEC-20260825-003 | 2026-08-25 | 搜索引擎启用前置校验与凭据配置 | 已确认实施 | REQ-20260825-003 | 2026-08-25：确认 API Key 通过弹窗加密保存，独立 daemon 需重启后生效 | `Decisions/DEC-20260825-003-engine-activation-requirements.md` |
+| DEC-20260825-003 | 2026-08-25 | 搜索引擎启用前置校验与凭据配置 | 已确认实施（Exa 生效边界被 DEC-20260831-003 取代） | REQ-20260825-003 | 2026-08-25：确认 API Key 通过弹窗加密保存；Exa 需重启 daemon 的历史边界已取消 | `Decisions/DEC-20260825-003-engine-activation-requirements.md` |
 | DEC-20260825-002 | 2026-08-25 | 移除 Startpage 与搜索结果 JSON 兼容策略 | 已确认实施 | REQ-20260825-002 | 2026-08-25：用户要求移除 Startpage、首页显示网站图标并支持嵌套 JSON，同时确认 MCP 搜索保持 JSON 暴露 | `Decisions/DEC-20260825-002-retire-startpage-and-result-json.md` |
-| DEC-20260825-001 | 2026-08-25 | Open-WebSearch 搜索引擎上游边界与错误映射 | 已实施 | BUG-20260825-001 | 2026-08-25：固化 Brave 新解析器，补充 Exa 官方 API 的环境变量路径与明确失败映射，识别 Startpage Anubis 反爬 | `Decisions/DEC-20260825-001-open-websearch-engine-boundaries.md` |
+| DEC-20260825-001 | 2026-08-25 | Open-WebSearch 搜索引擎上游边界与错误映射 | 已实施（Exa 方案被 DEC-20260831-003 取代） | BUG-20260825-001 | 2026-08-25：固化 Brave 新解析器并识别 Startpage Anubis 反爬；Exa 环境变量路径仅保留为历史记录 | `Decisions/DEC-20260825-001-open-websearch-engine-boundaries.md` |
 | DEC-20260823-001 | 2026-08-23 | V1 Bing 搜索模式边界 | 已实施 | REQ-20260823-001 | 2026-08-23：采用 HTTP request-only，并保留中英文切换；本地运行时已验证，生产回归归属阶段 4 | `Decisions/DEC-20260823-001-v1-search-mode.md` |
 | DEC-20260823-002 | 2026-08-23 | V1 门户迁移到 Next.js | 已实施 | REQ-20260823-001 | 2026-08-23：迁移静态门户为 Next.js JSX，建立基础组件与历史原型数据；当前门户已接入真实管理 API | `Decisions/DEC-20260823-002-nextjs-frontend.md` |
 | DEC-20260823-003 | 2026-08-23 | 阶段 2 的数据、安全与 Open-WebSearch 接入方案 | 已实施 | REQ-20260823-001 | 2026-08-23：用户要求直接完成阶段 2，采用私有 daemon HTTP 适配器、六表 SQLite 与独立密钥 | `Decisions/DEC-20260823-003-stage-2-data-and-upstream.md` |

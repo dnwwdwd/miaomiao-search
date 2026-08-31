@@ -1,5 +1,5 @@
 package: cloud.lazycat.app.miaomiao-search
-version: 0.1.1
+version: 0.1.2
 name: 喵喵搜索
 description: Self-hosted multi-engine web search and Remote MCP service.
 author: dnwwdwd

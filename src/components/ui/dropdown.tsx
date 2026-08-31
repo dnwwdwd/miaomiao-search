@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/cn";
 
@@ -17,6 +18,7 @@ export type DropdownProps<T extends string | number> = {
   className?: string;
   containerClassName?: string;
   menuClassName?: string;
+  placement?: "auto" | "bottom";
   disabled?: boolean;
   ariaLabel?: string;
   placeholder?: string;
@@ -29,15 +31,18 @@ export function Dropdown<T extends string | number>({
   className,
   containerClassName,
   menuClassName,
+  placement = "auto",
   disabled = false,
   ariaLabel,
   placeholder = "请选择",
 }: DropdownProps<T>) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const listId = useId();
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [menuStyle, setMenuStyle] = useState<CSSProperties | null>(null);
   const selectedIndex = options.findIndex((option) => option.value === value);
   const selected = selectedIndex >= 0 ? options[selectedIndex] : undefined;
   const enabledIndexes = options.map((option, index) => option.disabled ? -1 : index).filter((index) => index >= 0);
@@ -45,14 +50,46 @@ export function Dropdown<T extends string | number>({
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (!rootRef.current?.contains(target) && !menuRef.current?.contains(target)) setOpen(false);
     };
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const updatePosition = () => {
+      const button = buttonRef.current;
+      if (!button) return;
+      const rect = button.getBoundingClientRect();
+      const gap = 6;
+      const viewportPadding = 8;
+      const menuHeight = Math.min(256, Math.max(120, window.innerHeight - viewportPadding * 2));
+      const spaceBelow = window.innerHeight - rect.bottom - gap - viewportPadding;
+      const placeAbove = placement === "auto" && spaceBelow < 160 && rect.top > spaceBelow;
+      const height = Math.max(80, Math.min(menuHeight, placeAbove ? rect.top - gap - viewportPadding : spaceBelow));
+      const left = Math.min(Math.max(viewportPadding, rect.left), Math.max(viewportPadding, window.innerWidth - rect.width - viewportPadding));
+      setMenuStyle({
+        position: "fixed",
+        top: placeAbove ? Math.max(viewportPadding, rect.top - height - gap) : rect.bottom + gap,
+        left,
+        width: rect.width,
+        maxHeight: height,
+      });
+    };
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open, placement]);
+
   const openMenu = () => {
     setActiveIndex(selectedIndex >= 0 && !options[selectedIndex]?.disabled ? selectedIndex : (enabledIndexes[0] ?? -1));
+    if (placement === "bottom") buttonRef.current?.scrollIntoView({ block: "center", inline: "nearest" });
     setOpen(true);
   };
 
@@ -108,27 +145,28 @@ export function Dropdown<T extends string | number>({
         <span className="min-w-0 truncate">{selected?.label ?? placeholder}</span>
         <Icon name={open ? "caret-up" : "caret-down"} className="shrink-0 text-slate-400" />
       </button>
-      {open ? (
-        <div id={listId} role="listbox" aria-label={ariaLabel} className={cn("absolute inset-x-0 top-[calc(100%+0.35rem)] z-30 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10", menuClassName)}>
-          {options.map((option, index) => {
-            const selectedOption = option.value === value;
-            const activeOption = index === activeIndex;
-            return (
-              <button
-                key={`${String(option.value)}-${index}`}
-                type="button"
-                role="option"
-                aria-selected={selectedOption}
-                disabled={option.disabled}
-                className={cn("flex min-h-8 w-full items-center rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40", selectedOption ? "bg-blue-50 text-blue-700" : activeOption ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900")}
-                onClick={() => choose(index)}
-                onMouseEnter={() => setActiveIndex(index)}
-              >
-                {option.label}
-              </button>
-            );
-          })}
-        </div>
+      {open && menuStyle && typeof document !== "undefined" ? createPortal(
+        <div ref={menuRef} id={listId} role="listbox" aria-label={ariaLabel} data-dropdown-menu="true" style={menuStyle} className={cn("z-[70] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10", menuClassName)}>
+            {options.map((option, index) => {
+              const selectedOption = option.value === value;
+              const activeOption = index === activeIndex;
+              return (
+                <button
+                  key={`${String(option.value)}-${index}`}
+                  type="button"
+                  role="option"
+                  aria-selected={selectedOption}
+                  disabled={option.disabled}
+                  className={cn("flex min-h-8 w-full items-center rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40", selectedOption ? "bg-blue-50 text-blue-700" : activeOption ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900")}
+                  onClick={() => choose(index)}
+                  onMouseEnter={() => setActiveIndex(index)}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>,
+        document.body,
       ) : null}
     </div>
   );

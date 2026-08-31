@@ -13,6 +13,7 @@ import { SettingsService } from "./settings.js";
 import { TokenService, type TokenOwnerIndex, type VerifiedToken } from "./tokens.js";
 import { SlidingWindowRateLimiter } from "./rate-limiter.js";
 import { normalizeGatewayUserId, ownerIdForGateway } from "./local-accounts.js";
+import { createProviderRegistry } from "../providers/registry.js";
 
 export type UserStore = {
   gatewayUserId: string;
@@ -104,7 +105,7 @@ export class UserStoreManager implements TokenOwnerIndex {
     }, (requested: EngineId[]) => {
       const configured = database.orm.select().from(engines).all();
       return Object.fromEntries(requested.map((id) => [id, configured.find((engine) => engine.id === id)?.resultLimit ?? null]));
-    });
+    }, createProviderRegistry(settings, this.upstream));
     const store = { gatewayUserId, ownerId, database, settings, audit, tokens, search, rateLimiter } satisfies UserStore;
     this.stores.set(ownerId, store);
     return store;
