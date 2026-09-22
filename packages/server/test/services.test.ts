@@ -76,7 +76,7 @@ test("migration and bootstrap create default engines without a local administrat
   try {
     await bootstrapDatabase(database, config);
     await bootstrapDatabase(database, config);
-    assert.equal(count(database, "SELECT COUNT(*) AS count FROM engine"), 11);
+    assert.equal(count(database, "SELECT COUNT(*) AS count FROM engine"), 12);
     assert.equal(count(database, "SELECT COUNT(*) AS count FROM engine WHERE id = 'startpage'"), 0);
     assert.equal(count(database, "SELECT COUNT(*) AS count FROM setting"), 22);
     assert.equal(count(database, "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'local_account'"), 1);
@@ -102,7 +102,7 @@ test("bootstrap preserves existing engine defaults and user settings", async () 
   }
 });
 
-test("provider registry maps all eleven engines without sharing user settings", async () => {
+test("provider registry maps all twelve engines without sharing user settings", async () => {
   const { dir, config, database } = setup();
   try {
     await bootstrapDatabase(database, config);
@@ -110,6 +110,7 @@ test("provider registry maps all eleven engines without sharing user settings", 
     assert.deepEqual(engineIds.map((id) => registry.get(id).engine), [...engineIds]);
     assert.equal(registry.get("tavily").maxResults, 20);
     assert.equal(registry.get("bilibili").maxResults, 20);
+    assert.equal(registry.get("zhihu").maxResults, 20);
   } finally {
     database.close();
     rmSync(dir, { recursive: true, force: true });
@@ -634,12 +635,13 @@ test("management API authenticates a session and returns persisted portal data",
   const cookie = `miaomiao_search_session=${await auth.createSession({ id: "lazycat-user", account: "lazycat-user", name: "Lazycat User", role: "NORMAL", loginMethod: "oidc" })}`;
     const enginesResponse = await app.inject({ method: "GET", url: "/api/engines", headers: { host: "127.0.0.1", cookie: String(cookie).split(";")[0] } });
     assert.equal(enginesResponse.statusCode, 200);
-    assert.equal(enginesResponse.json().engines.length, 11);
+    assert.equal(enginesResponse.json().engines.length, 12);
     const enginePayload = enginesResponse.json().engines as Array<Record<string, unknown>>;
     assert.equal(enginePayload.find((engine) => engine.id === "tavily")?.maxResults, 20);
     assert.equal(enginePayload.find((engine) => engine.id === "github")?.apiKeyOptional, true);
     assert.equal(enginePayload.find((engine) => engine.id === "exa")?.credentialUrl, "https://dashboard.exa.ai/api-keys");
     assert.equal(enginePayload.find((engine) => engine.id === "bilibili")?.supportsApiKey, false);
+    assert.equal(enginePayload.find((engine) => engine.id === "zhihu")?.supportsApiKey, false);
     assert.equal(enginesResponse.json().engines.find((engine: { id: string }) => engine.id === "brave"), undefined);
     const exaWithoutKey = await app.inject({ method: "PATCH", url: "/api/engines/exa", headers: { host: "127.0.0.1", cookie: String(cookie).split(";")[0] }, payload: { enabled: true } });
     assert.equal(exaWithoutKey.statusCode, 400);

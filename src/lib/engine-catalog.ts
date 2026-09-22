@@ -17,6 +17,7 @@ export const engineCatalog: Record<string, EngineCatalogEntry> = {
   tavily: { id: "tavily", name: "Tavily", iconUrl: "https://tavily.com/favicon.ico", tagClass: "engine-tag-tavily" },
   github: { id: "github", name: "GitHub", iconUrl: "https://github.com/favicon.ico", tagClass: "engine-tag-github" },
   bilibili: { id: "bilibili", name: "Bilibili", iconUrl: "https://www.bilibili.com/favicon.ico", tagClass: "engine-tag-bilibili" },
+  zhihu: { id: "zhihu", name: "知乎", iconUrl: "https://zhuanlan.zhihu.com/favicon.ico", tagClass: "engine-tag-zhihu" },
 };
 
 export function getEngineMeta(value: string): EngineCatalogEntry {

@@ -9,7 +9,7 @@
 - 已确认目标：实现管理员 Web 搜索与远程 MCP 两个入口的自托管联网搜索服务，并在 V1 提供中文/英文切换。
 - 包含：PRD 定义的六个页面、多引擎搜索、正文抓取、MCP、认证、SQLite、审计、Docker 和懒猫微服部署。
 - 阶段边界：阶段 3 已创建面向浏览器的 `/api/*`、MCP Endpoint 与真实门户数据接入；Docker 与懒猫微服产物仍未创建。
-- 关联决策：`Decisions/DEC-20260823-001-v1-search-mode.md`、`Decisions/DEC-20260823-002-nextjs-frontend.md`。
+- 关联决策：`docs/Decisions/DEC-20260823-001-v1-search-mode.md`、`docs/Decisions/DEC-20260823-002-nextjs-frontend.md`。
 - 主要风险与依赖：V1 只使用 HTTP request 搜索；`open-websearch@2.1.11` 作为私有 daemon 依赖运行；真实搜索引擎和 MCP 客户端需在具备网络和凭据的环境回归。
 
 ## 阶段计划

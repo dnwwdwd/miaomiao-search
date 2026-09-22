@@ -19,7 +19,7 @@ application:
 
 services:
   web:
-    image: registry.lazycat.cloud/u30387910/c1own123/lazycat:f22d61d82f52b1a5
+    image: registry.lazycat.cloud/u30387910/c1own123/lazycat:e7c7298f4c759b30
     command: sh /opt/miaomiao-search/lzc/run-web.sh
     environment:
       - NODE_ENV=production
@@ -35,7 +35,7 @@ services:
       retries: 3
       start_period: 30s
   api:
-    image: registry.lazycat.cloud/u30387910/c1own123/lazycat:f22d61d82f52b1a5
+    image: registry.lazycat.cloud/u30387910/c1own123/lazycat:e7c7298f4c759b30
     command: sh /opt/miaomiao-search/lzc/run-api.sh
     user: "0"
     binds:

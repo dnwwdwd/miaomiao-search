@@ -1,7 +1,7 @@
 # DEC-20260823-001：V1 Bing 搜索模式边界
 
 - 状态：已确认待实施
-- 关联需求：`Requirements/REQ-20260823-001-v1-implementation-baseline.md`
+- 关联需求：`docs/Requirements/REQ-20260823-001-v1-implementation-baseline.md`
 - 确认日期：2026-08-23
 
 ## 已确认决定

@@ -9,20 +9,20 @@
 | 项目协作契约 | `AGENTS.md` | 协作、验证或提交规则变化时更新。 |
 | 项目说明 | `README.md` | 项目简介、本地运行、验证与安全说明更新时同步。 |
 | 文档地图 | `DOCUMENT_MAP.md` | 新建、移动或替换事实文档时更新。 |
-| 产品需求与产品设计 | `喵喵搜索 PRD.md` | 产品范围、页面、用户流程或验收变化时更新。 |
-| 技术规格 | `Miaomiao Search 技术实现文档.md` | 架构、接口、数据、兼容性或部署方案变化时更新。 |
+| 产品需求与产品设计 | `docs/喵喵搜索 PRD.md` | 产品范围、页面、用户流程或验收变化时更新。 |
+| 技术规格 | `docs/Miaomiao Search 技术实现文档.md` | 架构、接口、数据、兼容性或部署方案变化时更新。 |
 | UI 规范 | `docs/UI_GUIDE.md` | UI、交互、状态或响应式规则变化时更新。 |
 | 前端设计说明 | `docs/DESIGN.md` | Next.js 门户的视觉 token、组件和响应式规则变化时更新。 |
 | 业务流程 | `docs/SEARCH_AND_MCP_BUSINESS_FLOW.md` | Web 搜索、MCP、权限或数据流变化时更新。 |
 | 项目进度 | `docs/PROGRESS.md` | 总体阶段、里程碑或主要风险变化时更新。 |
 | Bug 台账 | `docs/BUG_TRACKER.md` | 发现、修复或验证 Bug 时更新。 |
 | 门户审查记录 | `docs/PORTAL_REVIEW_20260825.md` | 页面变量持久化、PRD 对齐与可用性审查时更新。 |
-| 需求台账 | `Requirements/LEDGER.md` | 每个非 Bug 需求创建、变更或完成时更新。 |
-| 详细需求记录 | `Requirements/REQ-*.md` | 跨模块、复杂或长期需求的范围、方案和验收变化时更新。 |
-| 决策台账 | `Decisions/LEDGER.md` | 重大方案提出、确认、调整或归档时更新。 |
-| 决策记录 | `Decisions/DEC-*.md` | 数据、架构、API、安全、外部依赖或难以回退的方案变化时更新。 |
-| 功能进度台账 | `Progress/LEDGER.md` | 大任务创建或阶段状态变化时更新。 |
-| 功能进度记录 | `Progress/PROG-*.md` | 大任务的计划、证据、风险、阻塞或完成结果变化时更新。 |
+| 需求台账 | `docs/Requirements/LEDGER.md` | 每个非 Bug 需求创建、变更或完成时更新。 |
+| 详细需求记录 | `docs/Requirements/REQ-*.md` | 跨模块、复杂或长期需求的范围、方案和验收变化时更新。 |
+| 决策台账 | `docs/Decisions/LEDGER.md` | 重大方案提出、确认、调整或归档时更新。 |
+| 决策记录 | `docs/Decisions/DEC-*.md` | 数据、架构、API、安全、外部依赖或难以回退的方案变化时更新。 |
+| 功能进度台账 | `docs/Progress/LEDGER.md` | 大任务创建或阶段状态变化时更新。 |
+| 功能进度记录 | `docs/Progress/PROG-*.md` | 大任务的计划、证据、风险、阻塞或完成结果变化时更新。 |
 
 ## 当前事实边界
 

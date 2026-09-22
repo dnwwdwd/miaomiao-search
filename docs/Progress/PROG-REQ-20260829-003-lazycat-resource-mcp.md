@@ -4,8 +4,8 @@
 
 - 目标：导出喵喵搜索 MCP provider，并支持小龙猫、Codex 等 Agent 通过 `.lzcx` 以当前懒猫用户身份调用。
 - 状态：代码与本地验证已完成；设备上的真实 Resource MCP 发现和应用间回归待执行。
-- 关联需求：`Requirements/REQ-20260829-003-lazycat-resource-mcp.md`
-- 关联决策：`Decisions/DEC-20260829-003-lazycat-resource-mcp.md`
+- 关联需求：`docs/Requirements/REQ-20260829-003-lazycat-resource-mcp.md`
+- 关联决策：`docs/Decisions/DEC-20260829-003-lazycat-resource-mcp.md`
 
 ## 实施记录
 

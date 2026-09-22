@@ -1,20 +1,45 @@
 node_modules/
 .DS_Store
+
+# Next.js / frontend build output
 .next/
 out/
 dist/
 build/
 coverage/
 .cache/
+.turbo/
+.vercel/
+.netlify/
+storybook-static/
+.eslintcache
+.stylelintcache
+.parcel-cache/
+
+# Package manager and tooling caches
 .pnpm-patches/
+.pnpm-debug.log*
+.npm/
+.yarn/
+.pnp.*
+
+# Local build and deployment output
 .lzc-work/
 lzc-dist/
 release/
+
+# Local application data and generated files
 .local-data/
+/tmp/
+/home/
 *.db
 *.sqlite
 *.sqlite3
 *.log
 *.tsbuildinfo
+
+# Local environment and credentials
 .env*
 !.env.example
+*.local
+*.pem

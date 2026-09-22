@@ -274,6 +274,8 @@ test("四类新增搜索源贯穿门户目录、封面和凭据契约", async ()
     assert.match(catalog, new RegExp(`${id}:`));
     assert.match(serverCatalog, new RegExp(`${id}:`));
   }
+  assert.match(catalog, /zhihu:/);
+  assert.match(serverCatalog, /zhihu:/);
   assert.match(types, /thumbnailUrl\?: string/);
   assert.match(types, /videoMeta\?:/);
   assert.match(types, /apiKeyOptional: boolean/);
@@ -286,7 +288,10 @@ test("四类新增搜索源贯穿门户目录、封面和凭据契约", async ()
   assert.match(page, /Thumbnail/);
   assert.match(page, /Bilibili video details/);
   assert.match(page, /setVideoResult/);
+  assert.match(page, /Zhihu article/);
+  assert.match(page, /readerIsZhihu/);
   for (const tag of ["firecrawl", "tavily", "github", "bilibili"]) assert.match(styles, new RegExp(`engine-tag-${tag}`));
+  assert.match(styles, /engine-tag-zhihu/);
 });
 
 test("门户交互保留浮层、最后来源提示和凭据申请入口", async () => {
@@ -307,4 +312,19 @@ test("门户交互保留浮层、最后来源提示和凭据申请入口", async
   assert.match(engines, /credentialVisible/);
   assert.match(engines, /credentialUrl/);
   assert.match(serverCatalog, /https:\/\/dashboard\.exa\.ai\/api-keys/);
+});
+
+test("知乎实验源保留站内查询、回退和正文错误契约", async () => {
+  const [provider, errors, business] = await Promise.all([
+    read("packages/server/src/providers/zhihu-provider.ts"),
+    read("src/components/portal/error-message.tsx"),
+    read("docs/SEARCH_AND_MCP_BUSINESS_FLOW.md"),
+  ]);
+  assert.match(provider, /site:\$\{zhihuHost\}/);
+  assert.match(provider, /engines: \["bing"\].*searchMode: "request"/s);
+  assert.match(provider, /engines: \["baidu"\]/);
+  assert.match(provider, /ZHIHU_SEARCH_UNAVAILABLE/);
+  assert.match(errors, /ZHIHU_SEARCH_UNAVAILABLE/);
+  assert.match(business, /知乎站内搜索无结果/);
+  assert.match(business, /CONTENT_NOT_EXTRACTED/);
 });

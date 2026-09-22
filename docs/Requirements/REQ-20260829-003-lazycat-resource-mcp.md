@@ -5,8 +5,8 @@
 - 分类：功能需求 / MCP / 部署 / 认证
 - 状态：已实施，待设备验证
 - 用户确认：2026-08-29 确认保留现有 Bearer Token，并增加严格限定的懒猫应用间委托模式；只发布 MCP provider，不发布项目 Skill。
-- 决策记录：`Decisions/DEC-20260829-003-lazycat-resource-mcp.md`
-- 功能进度文档：`Progress/PROG-REQ-20260829-003-lazycat-resource-mcp.md`
+- 决策记录：`docs/Decisions/DEC-20260829-003-lazycat-resource-mcp.md`
+- 功能进度文档：`docs/Progress/PROG-REQ-20260829-003-lazycat-resource-mcp.md`
 
 ## 背景与目标
 

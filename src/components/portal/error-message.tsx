@@ -34,6 +34,7 @@ const codeText: Record<string, { zh: string; en: string }> = {
   BILIBILI_BLOCKED: { zh: "B站公开搜索接口暂时阻断", en: "Bilibili public search is temporarily blocked" },
   BILIBILI_RATE_LIMITED: { zh: "B站请求触发限流", en: "Bilibili rate limit reached" },
   BILIBILI_API_ERROR: { zh: "B站搜索接口返回错误", en: "Bilibili search returned an API error" },
+  ZHIHU_SEARCH_UNAVAILABLE: { zh: "知乎搜索暂时不可用", en: "Zhihu search is temporarily unavailable" },
   ENGINE_API_KEY_REQUIRED: { zh: "启用此搜索源前需要配置 API Key", en: "Configure an API Key before enabling this source" },
   ENGINE_API_KEY_UNSUPPORTED: { zh: "此搜索源不支持 API Key", en: "This search source does not support an API Key" },
   ENGINE_RESULT_LIMIT_EXCEEDED: { zh: "返回数量超过此搜索源上限", en: "The requested result limit exceeds this source's maximum" },

@@ -2,7 +2,7 @@
 
 ## 状态
 
-本地实现完成，外部服务与设备回归待验证。关联决策：`Decisions/DEC-20260831-001-four-search-providers.md`；关联进度：`Progress/PROG-REQ-20260831-001-four-search-providers.md`。
+本地实现完成，外部服务与设备回归待验证。关联决策：`docs/Decisions/DEC-20260831-001-four-search-providers.md`；关联进度：`docs/Progress/PROG-REQ-20260831-001-four-search-providers.md`。
 
 ## 用户目标
 

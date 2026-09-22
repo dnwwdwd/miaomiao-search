@@ -8,6 +8,7 @@ import { FirecrawlProvider } from "./firecrawl-provider.js";
 import { GithubProvider, type GithubClientFactory } from "./github-provider.js";
 import { OpenWebSearchProvider } from "./open-websearch-provider.js";
 import { TavilyProvider } from "./tavily-provider.js";
+import { ZhihuProvider } from "./zhihu-provider.js";
 import type { SearchProvider } from "./types.js";
 
 export class SearchProviderRegistry {
@@ -30,6 +31,7 @@ export function createProviderRegistry(settings: SettingsService, upstream: Open
     else if (kind === "tavily") providers.set(id, new TavilyProvider(settings));
     else if (kind === "github") providers.set(id, new GithubProvider(settings, options.githubClientFactory));
     else if (kind === "bilibili") providers.set(id, new BilibiliProvider());
+    else if (kind === "zhihu") providers.set(id, new ZhihuProvider(upstream));
   }
   return new SearchProviderRegistry(providers);
 }

@@ -6,7 +6,7 @@ title: "Miaomiao Search 技术实现文档"
 
 # Miaomiao Search 技术实现文档
 
-> 项目名：miaomiao-search　基础项目：Open-WebSearch　文档版本：v1.1　实现同步：2026-08-31
+> 项目名：miaomiao-search　基础项目：Open-WebSearch　文档版本：v1.1　实现同步：2026-09-13
 
 ## 1. 技术栈总览
 
@@ -576,7 +576,7 @@ export function getLogs(params: { page, pageSize, channel?, operation?, tokenId?
 
 ### 4.9 Provider Registry 与外部搜索源
 
-`packages/server/src/providers/registry.ts` 为每个用户实例创建 Provider。六个旧引擎使用 `OpenWebSearchProvider`，Exa、Firecrawl、Tavily、GitHub 和 Bilibili 在 Fastify 内直接访问固定 HTTPS Endpoint：Exa `/search`、Firecrawl `/v2/search`、Tavily `/search`、GitHub REST `search.repos` 和 Bilibili `/x/web-interface/search/all/v2`。通用 HTTP 工具支持可注入 `fetch`、超时、2 MiB 响应体上限、禁止自动重定向，并在非 2xx 时保留状态码与响应头；不会记录 Authorization、Cookie、完整响应体或带敏感信息的请求 URL。
+`packages/server/src/providers/registry.ts` 为每个用户实例创建 Provider。六个旧引擎使用 `OpenWebSearchProvider`，Exa、Firecrawl、Tavily、GitHub 和 Bilibili 在 Fastify 内直接访问固定 HTTPS Endpoint：Exa `/search`、Firecrawl `/v2/search`、Tavily `/search`、GitHub REST `search.repos` 和 Bilibili `/x/web-interface/search/all/v2`。知乎由 `ZhihuProvider` 组合调用 daemon 的 Bing/Baidu，构造 `site:zhuanlan.zhihu.com` 并做精确主机过滤。通用 HTTP 工具支持可注入 `fetch`、超时、2 MiB 响应体上限、禁止自动重定向，并在非 2xx 时保留状态码与响应头；不会记录 Authorization、Cookie、完整响应体或带敏感信息的请求 URL。
 
 Exa、Firecrawl 与 Tavily 从当前用户的 `SettingsService` 读取加密 API Key；GitHub 使用 `@octokit/rest`，查询追加 `is:public`，只返回公共仓库并按 Token 变化重建 Client。Exa 的 Web/MCP 请求直接由 Fastify 发往官方 Search API，不依赖 `EXA_API_KEY` 环境变量。Bilibili 不使用登录态，首次 HTTP 412 或 `code=-412` 时只做一次首页匿名 Cookie 预热和一次重试，Cookie 只存在单次调用内存中。Bilibili 结果只接受视频分组，过滤直播条目，清理 HTML/实体并校验 `thumbnailUrl` 必须是无凭据 HTTPS `*.hdslb.com` URL，同时透传作者、时长、播放、点赞、收藏、评论和发布时间等可选 `videoMeta`。
 
@@ -971,7 +971,7 @@ provider 文件位于 `resources/mcp-providers/miaomiao-search/mcp.yml`，内容
 
 ## 11. 四类新增搜索源实现（2026-08-31）
 
-当前搜索目录包含 11 个引擎：Bing、Baidu、DuckDuckGo、Exa、CSDN、Juejin、Sogou、Firecrawl、Tavily、GitHub 和 Bilibili。四个新增引擎首次写入用户库时均为关闭状态，bootstrap 只插入缺失引擎，不覆盖已有用户的启用、默认、数量和顺序配置。
+截至 2026-08-31，搜索目录包含 11 个引擎：Bing、Baidu、DuckDuckGo、Exa、CSDN、Juejin、Sogou、Firecrawl、Tavily、GitHub 和 Bilibili。四个新增引擎首次写入用户库时均为关闭状态，bootstrap 只插入缺失引擎，不覆盖已有用户的启用、默认、数量和顺序配置；2026-09-13 新增的知乎实验见下方 11.1。
 
 Fastify 为每个用户实例创建 `SearchProviderRegistry`。六个旧引擎通过 `OpenWebSearchProvider` 继续调用 daemon；Exa、Firecrawl、Tavily、GitHub 和 Bilibili 在 Fastify 内使用固定 HTTPS Endpoint。正文抓取仍由 `SearchService` 复用 Open-WebSearch 链路，不与搜索 Provider 混用。
 
@@ -979,4 +979,10 @@ Fastify 为每个用户实例创建 `SearchProviderRegistry`。六个旧引擎�
 
 Exa、Firecrawl 与 Tavily 使用当前用户的加密 Key，GitHub Token 可选且查询固定追加 `is:public` 并过滤私有仓库；Bilibili 不读取登录态。Bilibili 首次收到 HTTP 412 或响应 `code=-412` 时只做一次匿名首页 Cookie 预热和一次重试，Cookie 只存在本次调用内存中。通用 HTTP 工具限制 20 秒级超时、2 MiB 响应体、禁止自动重定向，并保留非 2xx 状态码和响应头用于 Provider 错误映射。
 
-MCP `search` Tool 名称与返回结构保持不变，工具描述和引擎枚举按当前用户启用状态及 MCP 顺序动态生成。引擎管理 API 返回凭据模式、标签、占位符和 Provider `maxResults`；必需 Key、可选 Token、Bilibili 无凭据和健康状态映射均由服务端校验。默认 CI 使用注入的 fetch/Octokit Client 测试，不访问真实外部 API。
+MCP `search` Tool 名称与返回结构保持不变，工具描述和引擎枚举按当前用户启用状态及 MCP 顺序动态生成。引擎管理 API 返回凭据模式、标签、占位符和 Provider `maxResults`；必需 Key、可选 Token、Bilibili/知乎无凭据和健康状态映射均由服务端校验。默认 CI 使用注入的 fetch/Octokit Client 测试，不访问真实外部 API。
+
+### 11.1 知乎站内搜索实验（2026-09-13）
+
+知乎不接入官方搜索 API、CLI Token 或 Cookie。`packages/server/src/providers/zhihu-provider.ts` 构造 `site:zhuanlan.zhihu.com <query>`，先调用 Open-WebSearch daemon 的 Bing request 模式；过滤精确 `zhuanlan.zhihu.com` 主机后，若无匹配结果再请求 Baidu。结果统一写入 `engines: ["zhihu"]`，Provider 上限为 20 条，首次 bootstrap 为关闭且非默认，不新增数据库字段或迁移。
+
+知乎正文沿用 `SearchService.fetchContent` 和通用 `fetch-web`，因此继续具备 HTTP(S)/无凭据校验、重定向和响应体/正文上限、Readability、结构化数据和 Playwright 浏览器回退。门户仅在阅读器中增加知乎标题、Tag 和“打开知乎”按钮；页面可访问但无正文时仍返回 `CONTENT_NOT_EXTRACTED`，显示重试与打开源站入口。在线 POC 受 Bing 索引、知乎 403 challenge 和目标运行时系统依赖影响，详见 `docs/Requirements/REQ-20260913-001-zhihu-search-source.md`。

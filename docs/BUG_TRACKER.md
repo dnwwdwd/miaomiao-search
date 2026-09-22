@@ -11,7 +11,7 @@
 
 ## 当前记录
 
-本轮发现的 PRD、技术文档和原型口径差异记录在 `Requirements/REQ-20260823-001-v1-implementation-baseline.md` 与 `Decisions/DEC-20260823-001-v1-search-mode.md`，不作为运行时 Bug。
+本轮发现的 PRD、技术文档和原型口径差异记录在 `docs/Requirements/REQ-20260823-001-v1-implementation-baseline.md` 与 `docs/Decisions/DEC-20260823-001-v1-search-mode.md`，不作为运行时 Bug。
 
 | ID | 状态 | 问题 | 根因 / 发现 | 修复情况 | 验证 |
 |---|---|---|---|---|---|

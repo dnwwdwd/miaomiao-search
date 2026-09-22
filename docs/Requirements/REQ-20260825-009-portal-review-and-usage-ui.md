@@ -2,7 +2,7 @@
 
 ## 目标
 
-梳理 Login、Search、MCP、Engines、Usage、Settings 及全局状态的持久化边界，核对 `喵喵搜索 PRD.md` 的页面/功能口径，并收口门户文案与布局：修复 Usage 审计表横向滚动位置、统计 KPI 卡片布局、统计范围下拉遮挡、DuckDuckGo 引擎 Tag 图标加载问题，统一审计筛选与表格国际化，将引擎贡献改为引擎统计，并移除 Settings 的默认搜索参数 Card。
+梳理 Login、Search、MCP、Engines、Usage、Settings 及全局状态的持久化边界，核对 `docs/喵喵搜索 PRD.md` 的页面/功能口径，并收口门户文案与布局：修复 Usage 审计表横向滚动位置、统计 KPI 卡片布局、统计范围下拉遮挡、DuckDuckGo 引擎 Tag 图标加载问题，统一审计筛选与表格国际化，将引擎贡献改为引擎统计，并移除 Settings 的默认搜索参数 Card。
 
 ## 范围与边界
 

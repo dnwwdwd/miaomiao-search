@@ -2,7 +2,7 @@
 
 ## 状态
 
-进行中。用户于 2026-08-25 确认按 `Decisions/DEC-20260825-003-engine-activation-requirements.md` 实施。
+进行中。用户于 2026-08-25 确认按 `docs/Decisions/DEC-20260825-003-engine-activation-requirements.md` 实施。
 
 ## 范围
 

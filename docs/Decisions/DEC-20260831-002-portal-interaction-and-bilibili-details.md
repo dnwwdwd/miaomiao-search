@@ -2,7 +2,7 @@
 
 ## 状态
 
-已确认实施。关联需求：`Requirements/REQ-20260831-002-portal-dropdown-reader-credentials.md`。
+已确认实施。关联需求：`docs/Requirements/REQ-20260831-002-portal-dropdown-reader-credentials.md`。
 
 ## 决定
 

@@ -1,4 +1,4 @@
-export const engineIds = ["bing", "baidu", "duckduckgo", "exa", "csdn", "juejin", "sogou", "firecrawl", "tavily", "github", "bilibili"] as const;
+export const engineIds = ["bing", "baidu", "duckduckgo", "exa", "csdn", "juejin", "sogou", "firecrawl", "tavily", "github", "bilibili", "zhihu"] as const;
 export type EngineId = (typeof engineIds)[number];
 
 /**

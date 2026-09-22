@@ -1,7 +1,7 @@
 # 搜索与 MCP 业务流程
 
-> 最后更新：2026-08-31
-> 状态：四类新增搜索源已接入本地实现；阶段 4 部署与生产端到端验证待开始
+> 最后更新：2026-09-13
+> 状态：知乎站内搜索实验已接入本地实现；真实网络、浏览器运行时和设备端验证待执行
 > 适用范围：Web Search、Remote MCP、认证、缓存、审计、搜索历史、正文抓取和 Provider
 
 ## 入口与前置条件
@@ -15,14 +15,14 @@
 - MCP 入口：外部 Agent 向网关放行的 `/mcp` 发送 Streamable HTTP POST。外部客户端使用有效 Bearer Token；懒猫应用间 Agent 使用 `.lzcx` 入口，由 ingress 消费用户票据并注入 `X-HC-SOURCE=app:<包名>` 和 `X-HC-USER-ID`。当前不开放 Legacy SSE，也不读取 OIDC Cookie 或 `X-HC-USER-TICKET`。
 - 持久化数据：引擎配置、系统设置、Access Token、搜索历史和审计日志写入 SQLite；新 LPK 实例挂载空的 `/lzcapp/var/miaomiao-search/data` 目录，包内不携带数据库。搜索与正文缓存为进程内缓存，重启后清空。
 - 安全前提：服务端校验 OIDC/本地应用会话、Token Scope、Token 状态和额度；本地密码只保存 scrypt 哈希；正文请求保留 URL、HTTP(S)、无凭据、超时、响应体大小和正文长度约束。公网入口与网络访问范围由 Cloudflare Tunnel/部署网络负责。
-- 非目标范围：不改变现有角色和管理权限模型；不启用 Playwright 搜索模式；Bing 实际执行路径固定为 HTTP request；不提供 Provider 专属 MCP Tool，不下载或代理 B站封面。
+- 非目标范围：不改变现有角色和管理权限模型；不启用 Playwright 搜索模式；Bing 实际执行路径固定为 HTTP request；知乎不调用官方 API、保存 Token/Cookie 或绕过挑战页；不提供 Provider 专属 MCP Tool，不下载或代理 B站封面。
 
 ## Web 搜索主流程
 
 1. 管理员输入关键词或完整 URL；空输入不能提交。
 2. 完整 URL 进入正文读取流程；关键词搜索提交选中引擎、首页持久化的可选调用方 Limit 和适用的 Bing 搜索模式，未传 Limit 时使用各引擎配置。
-3. 服务端校验会话和参数，读取引擎配置与缓存，再按 Provider Registry 调度对应搜索源。其他六个旧引擎进入 Open-WebSearch daemon；Exa、Firecrawl、Tavily、GitHub、B站由 Fastify 直接调用固定 HTTPS Endpoint。Exa 的 API Key 从当前用户加密设置读取。
-4. 服务端按引擎独立请求，每个引擎的有效数量取调用方 Limit、引擎 `result_limit`、Provider `maxResults` 和系统上限的最小值；先按引擎截取，再按规范化 URL 生成聚合结果。响应同时提供 `engineResults[]` 分组结果和兼容的 `results` 平铺结果，重复 URL 在已有封面或视频元数据为空时补入新 `thumbnailUrl`/`videoMeta`。B站结果点击后由门户展示视频详情，不进入通用正文抓取。
+3. 服务端校验会话和参数，读取引擎配置与缓存，再按 Provider Registry 调度对应搜索源。其他六个旧引擎进入 Open-WebSearch daemon；Exa、Firecrawl、Tavily、GitHub、B站由 Fastify 直接调用固定 HTTPS Endpoint；知乎由 Fastify Provider 通过 daemon 的 Bing/Baidu 请求承载 `site:zhuanlan.zhihu.com` 查询。Exa 的 API Key 从当前用户加密设置读取。
+4. 服务端按引擎独立请求，每个引擎的有效数量取调用方 Limit、引擎 `result_limit`、Provider `maxResults` 和系统上限的最小值；先按引擎截取，再按规范化 URL 生成聚合结果。响应同时提供 `engineResults[]` 分组结果和兼容的 `results` 平铺结果，重复 URL 在已有封面或视频元数据为空时补入新 `thumbnailUrl`/`videoMeta`。知乎 Provider 先用 Bing request 搜索，过滤精确专栏主机，无匹配时回退 Baidu；B站结果点击后由门户展示视频详情，知乎结果进入通用正文读取但使用独立来源展示。
 5. 服务端记录 Request ID、耗时、缓存命中、结果数、状态和错误码；Web 搜索在历史开启时保存 Query、引擎选择、分组/聚合结果快照与失败引擎信息。
 6. 前端展示结果、来源标签、部分失败或明确错误状态。正文请求校验 URL 与 HTTP(S) 协议后交给 Open-WebSearch；上游按请求、浏览器 Cookie、浏览器渲染、Readability、语义 HTML 和结构化数据多策略提取，再按长度限制安全呈现。页面可访问但没有可读正文时返回 `CONTENT_NOT_EXTRACTED`/422，门户显示重试与打开源站入口，MCP 保持相同错误契约。
 
@@ -50,6 +50,8 @@
 | Firecrawl/Tavily 凭据缺失或失效 | 必需 Key 未配置时拒绝启用；401/403、额度、限流和无效响应映射稳定错误码 | 门户显示本地化错误；MCP 保留错误码 | 配置或更换 Key，等待额度/限流恢复 |
 | GitHub 查询失败 | 仅搜索公共仓库；Token 可选；401、422、403/429 和限流重置头映射稳定错误 | 返回 GitHub 专用错误码，不暴露 Token | 修正查询、配置 Token 或等待限流 |
 | B站公开搜索被阻断 | 412/-412 只执行一次匿名首页 Cookie 预热和一次重试；持续阻断记为 `BILIBILI_BLOCKED` | Web/MCP 保留其他引擎结果，封面只显示官方 CDN URL | 稍后重试，接受 B站公开接口风控 |
+| 知乎站内搜索无结果 | Bing 过滤后为空时回退 Baidu；两者仍无知乎专栏结果则返回空结果 | Web/MCP 显示知乎分组为空，不制造站外伪结果 | 调整关键词或确认 Bing/Baidu 索引 |
+| 知乎站内搜索上游失败 | 两个搜索路径都失败时返回 `ZHIHU_SEARCH_UNAVAILABLE` 或明确上游 DomainError | Web 显示分组错误，MCP 保留错误码 | 检查 daemon、网络或稍后重试 |
 | 所有搜索源失败 | 不返回伪结果，记录错误 | 区分超时、限流、代理和运行时失败 | 检查网络、代理、引擎状态或 daemon 配置 |
 | 搜索成功但无结果 | 保存空结果快照并返回成功状态 | Web 展示空结果状态；MCP 返回空数组 | 修改关键词或引擎后重试 |
 | 正文 URL 不可用 | 拒绝无效 URL、非 HTTP(S)、带凭据 URL，或由上游返回超时/过大响应 | 返回对应正文读取错误 | 使用可访问且符合协议的 HTTP(S) URL |
@@ -71,5 +73,6 @@
 - 已在本地验证登录、门户页面切换、真实搜索、正文 URL/上游错误、搜索历史快照、永久保存设置、MCP 管理 API 和 Streamable HTTP 路径。
 - 已补充 Resource MCP provider 元数据、可信懒猫应用间委托鉴权、用户隔离和委托审计测试；真实小龙猫/Codex 发现及 `.lzcx` 回归仍需部署到 `lzcos >= 1.5.2` 的设备。
 - 已补充验证 MCP 引擎启停后的动态 `tools/list`、站点专用正文 endpoint、具体上游错误映射和四类 Provider 的注入式单测；B站 412 预热重试、视频分组过滤、HTML 清理和官方 CDN 封面校验均有覆盖。
+- 知乎站内搜索实验已补充 `ZhihuProvider` 的查询拼接、Bing→Baidu 回退、精确主机过滤、结果归一化和双上游失败单测；门户增加知乎正文标题、Tag、打开按钮，正文仍复用通用 `fetch-web`。当前出口的在线 Bing POC 未返回精确知乎结果，Baidu 返回的 `baidu.com/link` 跳转地址被安全过滤；知乎专栏请求返回 403 challenge，浏览器回退还需要 `libnspr4.so`，均待目标镜像/设备复测。
 - 四类新增搜索源已完成本地实现：服务层分组响应、兼容平铺结果、独立缓存版本、历史封面兼容、MCP 动态枚举、凭据模式和首页/管理页数量上限已接入；真实 Firecrawl、Tavily、GitHub 和设备端 B站回归仍需显式环境与部署环境验证。
 - 本地认证测试、Dockerfile 静态检查、脚本语法检查、Docker Hub 推送、官方 registry 复制和懒猫微服打包已完成；阶段 4 仍需验证 Cloudflare Tunnel 回源、真实网络下的各引擎、网页正文、MCP 客户端兼容性，以及懒猫设备上的认证流程。

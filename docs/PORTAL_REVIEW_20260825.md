@@ -1,7 +1,7 @@
 # 门户持久化、PRD 对齐与可用性审查
 
 > 审查日期：2026-08-25
-> 对照文档：`喵喵搜索 PRD.md`、`docs/UI_GUIDE.md`、`docs/DESIGN.md`
+> 对照文档：`docs/喵喵搜索 PRD.md`、`docs/UI_GUIDE.md`、`docs/DESIGN.md`
 > 证据范围：`app/`、`src/components/portal/`、`src/lib/api.ts`、`packages/server/src/`、现有契约/服务端测试
 
 ## 结论

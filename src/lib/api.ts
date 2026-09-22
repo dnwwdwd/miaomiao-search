@@ -28,7 +28,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-const engineNames: Record<string, string> = { bing: "Bing", baidu: "Baidu", duckduckgo: "DuckDuckGo", exa: "Exa", csdn: "CSDN", juejin: "Juejin", sogou: "Sogou", firecrawl: "Firecrawl", tavily: "Tavily", github: "GitHub", bilibili: "Bilibili" };
+const engineNames: Record<string, string> = { bing: "Bing", baidu: "Baidu", duckduckgo: "DuckDuckGo", exa: "Exa", csdn: "CSDN", juejin: "Juejin", sogou: "Sogou", firecrawl: "Firecrawl", tavily: "Tavily", github: "GitHub", bilibili: "Bilibili", zhihu: "知乎" };
 const engineHealth = (value: string, enabled: boolean): SearchEngine["health"] => !enabled ? "Disabled" : value === "healthy" ? "Healthy" : value === "degraded" ? "Degraded" : value === "rate_limited" ? "Rate Limited" : value === "blocked" ? "Blocked" : value === "unavailable" ? "Unavailable" : "Unknown";
 const tokenStatus = (value: string): McpToken["status"] => value === "active" ? "Active" : value === "disabled" ? "Disabled" : "Revoked";
 

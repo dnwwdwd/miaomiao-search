@@ -1,11 +1,11 @@
 # 喵喵搜索项目进度
 
-> 最后更新：2026-08-31
-> 当前阶段：四类新增搜索源已完成本地 Provider、门户、MCP、历史快照和审计接入；真实外部 API 与懒猫设备回归待开始。
+> 最后更新：2026-09-13
+> 当前阶段：知乎站内搜索实验已完成本地 Provider、门户和 MCP 接入；真实网络、浏览器运行时与懒猫设备回归待执行。
 
 ## 当前口径
 
-喵喵搜索计划作为自托管联网搜索服务运行，提供懒猫 OIDC/本地账号 Web 门户和可供外部 Agent 调用的 MCP 服务。当前发布 LPK 目标为 Linux x86-64；产品范围以 `喵喵搜索 PRD.md` 为准，技术方案以 `Miaomiao Search 技术实现文档.md` 为准。
+喵喵搜索计划作为自托管联网搜索服务运行，提供懒猫 OIDC/本地账号 Web 门户和可供外部 Agent 调用的 MCP 服务。当前发布 LPK 目标为 Linux x86-64；产品范围以 `docs/喵喵搜索 PRD.md` 为准，技术方案以 `docs/Miaomiao Search 技术实现文档.md` 为准。
 
 本轮初始化开始前，仓库只有 PRD、技术实现文档、静态门户原型和协作规范四个项目文件。当前根目录已有 Next.js 工程与 pnpm workspace，`packages/server` 已包含数据库迁移、领域服务、管理 API、MCP transport 和服务端测试；LPK V2 配置、Linux x86-64 构建和双服务运行脚本已实现，懒猫设备安装与真实端到端回归仍待完成。
 
@@ -19,8 +19,8 @@
 | 技术设计 | 已同步当前实现 | 技术文档已区分实际 Next/Fastify/SQLite/MCP 实现与历史部署草图；已补充 Provider Registry、Exa/Firecrawl/Tavily/GitHub/B站固定外部 Endpoint、用户加密凭据、thumbnailUrl 和 B站结果边界。 | Docker、懒猫微服和生产拓扑确认。 |
 | 门户交互原型 | 已保留为历史参照 | `miaomiao_search_portal.html` 覆盖原始页面和交互说明。 | 与 JSX 门户保持需求一致。 |
 | 工程基础 | 已完成前端范围 | 根目录已有 Next.js、pnpm、TypeScript、Tailwind CSS、ESLint、生产构建和 lockfile。 | 真实服务端接入前确认项目目录和运行方式。 |
-| 服务端与数据库 | 四类 Provider 本地实现完成 | `packages/server` 已有 SQLite 迁移、OIDC/本地账号应用会话、管理 API、MCP Token、Streamable HTTP、设置加密、审计、历史结果快照、永久保存、按引擎搜索分组、Provider Registry、固定 REST/Octokit/B站适配和 Open-WebSearch HTTP 适配器；入口 Host/Origin 与正文 DNS/SSRF 过滤按部署决策移除。 | 完成部署配置与真实网络回归。 |
-| Web 前端 | 新引擎与封面接入完成 | `app/` 与 `src/components/portal/` 的登录和五个管理页面已使用 Next rewrite 调用真实 API；首页支持 11 个目录引擎、按 Provider 上限过滤数量、B站封面 lazy/no-referrer/fallback、凭据模式和中英文错误提示。 | 做浏览器端真实 API、响应式封面和部署后的同源路径回归。 |
+| 服务端与数据库 | 知乎 Provider 本地实现完成 | `packages/server` 已有 SQLite 迁移、OIDC/本地账号应用会话、管理 API、MCP Token、Streamable HTTP、设置加密、审计、历史结果快照、永久保存、按引擎搜索分组、Provider Registry、固定 REST/Octokit/B站适配、知乎 Bing→Baidu 站内查询和 Open-WebSearch HTTP 适配器；入口 Host/Origin 与正文 DNS/SSRF 过滤按部署决策移除。 | 完成部署配置与真实网络回归。 |
+| Web 前端 | 知乎来源展示接入完成 | `app/` 与 `src/components/portal/` 的登录和五个管理页面已使用 Next rewrite 调用真实 API；首页支持 12 个目录引擎、按 Provider 上限过滤数量、B站封面 lazy/no-referrer/fallback、知乎阅读器来源样式、凭据模式和中英文错误提示。 | 做浏览器端真实 API、知乎正文和部署后的同源路径回归。 |
 | 测试与安全验证 | 默认本地验证通过 | 服务端 Provider 与 MCP 凭据注入测试、门户契约、HTTP 响应上限、B站 412 重试与封面校验、GitHub Token 重建、缓存和健康状态均有覆盖；全量命令结果在本轮交付记录。 | 做 Docker、Tunnel 回源、真实抓取和 MCP 客户端回归。 |
 | Docker 与懒猫微服 | 自定义 amd64 镜像与轻量 LPK 已发布，含 Chromium/Playwright 运行时，设备回归待执行 | `Dockerfile` 生成 web/API/daemon 运行镜像并安装 Chromium；API 生产依赖包含 `playwright-core`；LPK 内容目录只保留说明文件；清单放行认证入口、注入浏览器路径并挂载 SQLite 数据。 | 在懒猫设备完成 OIDC、本地账号、改密、退出登录、MCP 和动态正文回归。 |
 
@@ -35,6 +35,8 @@
 - 2026-08-29：完成正文阅读器骨架屏/链接新窗口/引擎来源 Tag、前端错误摘要与详情展开、首页/MCP 引擎顺序拖拽持久化和桌面 90% 宽度调整；待登录后的浏览器与 MCP 顺序回归。
 - 2026-08-31：完成 Firecrawl、Tavily、GitHub、B站 Provider Registry、统一 HTTP 安全边界、用户凭据加密、11 引擎目录、Provider 上限、B站视频封面和 412 匿名预热重试；门户、MCP、历史快照、审计、错误本地化和 Provider 单测已同步。
 - 2026-08-31：修复表格内 Dropdown 被滚动容器裁剪并强制末行向下展开，正文阅读器内容区补圆角；B站搜索结果增加视频元数据详情弹窗并隐藏正文复制按钮；凭据弹窗增加官网申请入口和明文/脱敏切换，首页最后来源与引擎管理凭据 Tag 增加交互提示；Exa 改为从当前用户加密数据库设置读取并补充 MCP 测试；待登录后的浏览器视觉回归。
+- 2026-09-13：新增实验性知乎 Provider，使用 `site:zhuanlan.zhihu.com` 经 Bing request 搜索并在无匹配时回退 Baidu；精确过滤知乎专栏主机，门户正文阅读器增加知乎标题/Tag/打开按钮，MCP 动态枚举与引擎管理目录同步；在线 POC 中 Bing 未返回精确知乎结果，Baidu 返回 `baidu.com/link` 跳转地址后被安全过滤，知乎正文仍受 403 challenge 和 `libnspr4.so` 缺失影响，待完整镜像与设备复测。
+- 2026-09-13：版本升级到 `0.1.3`，完成 amd64 镜像 Docker Hub 推送、懒猫官方 registry 复制、`project lint`、LPK release 和 `lpk lint`；设备安装与真实端到端回归仍待执行。
 
 - 2026-08-24：搜索历史已扩展为关键词、引擎选择和结果快照，历史详情支持查看旧结果与再次搜索；`-1` 表示永久保存；首页按原型视觉语言完成工作区层级优化。
 - 2026-08-24：完成顶部应用品牌与服务状态 Tag、MCP 模板换行、页面说明收敛和统计审计多维度布局；同步 PRD、技术实现、业务流程及需求/决策/进度台账。

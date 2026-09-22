@@ -20,3 +20,6 @@
 - [x] 构建并推送 `docker.io/c1own123/lazycat:miaomiao-search-0.1.1-amd64`（digest `sha256:6d7848eabdab831faa100ac946770b1a3769262ca297643b93b09e1fe75505fe`）。
 - [x] 复制镜像到懒猫官方 registry `registry.lazycat.cloud/u30387910/c1own123/lazycat:ea3fb3085d670d4e`，并更新 `lzc-manifest.yml`。
 - [x] 构建并校验 `release/miaomiao-search-0.1.1.lpk`；包内 web/API 均引用新镜像并注入 Playwright 配置。
+- [x] 2026-09-13 重新打包 `0.1.3`：镜像 `docker.io/c1own123/lazycat:miaomiao-search-0.1.3-amd64`（digest `sha256:ff756f8d962c2e476a697a11f824d1fc65523a5e8020aaae39e7281473efa2a3`）已推送 Docker Hub。
+- [x] 复制到懒猫官方 registry `registry.lazycat.cloud/u30387910/c1own123/lazycat:e7c7298f4c759b30`，并更新 `lzc-manifest.yml`。
+- [x] 构建并校验 `release/miaomiao-search-0.1.3.lpk`（152,064 bytes，SHA-256 `00d658a12e4d312df2684a2be2f89813c2a2702dfbc82a715094a1efbd84c9c2`）；项目与 LPK lint 均通过。

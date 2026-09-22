@@ -2,7 +2,7 @@
 
 ## 状态
 
-已实施。关联需求：`Requirements/REQ-20260823-001-v1-implementation-baseline.md`。用户于 2026-08-23 明确要求开始并完成阶段 2，本记录中的推荐方案随之确认。
+已实施。关联需求：`docs/Requirements/REQ-20260823-001-v1-implementation-baseline.md`。用户于 2026-08-23 明确要求开始并完成阶段 2，本记录中的推荐方案随之确认。
 
 ## 要解决的问题
 

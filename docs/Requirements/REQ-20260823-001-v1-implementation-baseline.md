@@ -5,8 +5,8 @@
 - 分类：功能需求
 - 状态：进行中
 - 用户确认：2026-08-23 已确认建立协作流程、核对原型并编写项目进度；确认 V1 保留中英文切换、移除 Playwright，并补齐本记录列出的门户能力；同日确认把静态门户迁移为 Next.js JSX、建立原型数据；随后明确要求直接完成阶段 2，确认 `DEC-20260823-003` 的推荐方案。
-- 决策记录：`Decisions/DEC-20260823-001-v1-search-mode.md`、`Decisions/DEC-20260823-002-nextjs-frontend.md`、`Decisions/DEC-20260823-003-stage-2-data-and-upstream.md`
-- 功能进度文档：`Progress/PROG-REQ-20260823-001-v1-implementation.md`
+- 决策记录：`docs/Decisions/DEC-20260823-001-v1-search-mode.md`、`docs/Decisions/DEC-20260823-002-nextjs-frontend.md`、`docs/Decisions/DEC-20260823-003-stage-2-data-and-upstream.md`
+- 功能进度文档：`docs/Progress/PROG-REQ-20260823-001-v1-implementation.md`
 - 后续关联需求：`REQ-20260824-007` 将多引擎独立结果数量与分组展示作为阶段 3 后续收口，不改变本 V1 基线的阶段 4 部署边界。
 
 ## 背景与目标

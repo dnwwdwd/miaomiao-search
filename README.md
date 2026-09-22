@@ -6,8 +6,8 @@
 
 ## 功能
 
-- 聚合 11 个搜索源：Bing、Baidu、DuckDuckGo、Exa、CSDN、Juejin、Sogou、Firecrawl、Tavily、GitHub 和 B站，并记录部分失败信息。
-- Firecrawl/Tavily 使用用户加密 API Key；GitHub 支持可选 Token 的公共仓库搜索；B站通过公开接口搜索视频并返回经校验的官方 CDN 封面 URL。四个新增源首次启用时默认关闭。
+- 聚合 12 个搜索源：Bing、Baidu、DuckDuckGo、Exa、CSDN、Juejin、Sogou、Firecrawl、Tavily、GitHub、B站和知乎，并记录部分失败信息。
+- Firecrawl/Tavily 使用用户加密 API Key；GitHub 支持可选 Token 的公共仓库搜索；B站通过公开接口搜索视频并返回经校验的官方 CDN 封面 URL；知乎通过 `site:zhuanlan.zhihu.com` 使用 Bing/Baidu 做实验性站内搜索，正文复用通用网页抓取。新增源首次启用时默认关闭，知乎不需要 Token。
 - 读取网页正文；正文目标允许应用运行环境可达的任意 HTTP(S) 地址，保留 URL 格式、无凭据、超时、响应体大小和正文长度限制。
 - 管理搜索引擎、缓存、限流、历史记录和审计日志。
 - 通过 Streamable HTTP 暴露 MCP Tools；外部客户端使用 Access Token，懒猫小龙猫、Codex 等应用间 Agent 可通过 Resource MCP 委托访问。
@@ -91,8 +91,8 @@ pnpm build
 
 ```bash
 ./lzc/build-image.sh
-lzc-cli project release -o release/miaomiao-search-0.1.2.lpk
-lzc-cli lpk lint release/miaomiao-search-0.1.2.lpk
+lzc-cli project release -o release/miaomiao-search-0.1.3.lpk
+lzc-cli lpk lint release/miaomiao-search-0.1.3.lpk
 ```
 
 `lzc/build-image.sh` 将镜像推送到 `docker.io/c1own123/lazycat:miaomiao-search-<version>-amd64`，再调用 `lzc-cli appstore copy-image --arch amd64` 并把官方地址写入 `lzc-manifest.yml`。LPK 内容目录只保留说明文件，web/API/daemon 运行文件来自镜像。当前发布包目标为 Linux x86-64；API 容器启动时会在 Fastify 前启动 Open-WebSearch daemon，并等待 `/health` 就绪。
@@ -112,6 +112,10 @@ lzc-cli lpk lint release/miaomiao-search-0.1.2.lpk
 ## 文档
 
 文档入口在 [DOCUMENT_MAP.md](DOCUMENT_MAP.md)。产品需求、技术实现、UI 规范、业务流程、需求记录、决策记录和进度记录均可从该文件定位。
+
+## 致谢
+
+本项目基于 [Open-WebSearch](https://github.com/Aas-ee/open-webSearch) 构建，复用了其多引擎联网搜索、网页正文读取、MCP Server 和本地 HTTP daemon 能力。当前通过 `open-websearch@2.1.11` 接入，并在此基础上增加 Next.js 门户、Fastify 服务、用户隔离、懒猫微服部署和 Remote MCP 能力。感谢 Open-WebSearch 的作者与贡献者。
 
 ## 许可
 

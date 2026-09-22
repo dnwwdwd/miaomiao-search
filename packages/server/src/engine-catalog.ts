@@ -1,7 +1,7 @@
 import type { EngineId } from "./domain.js";
 
 export type CredentialMode = "none" | "optional" | "required";
-export type ProviderKind = "open-websearch" | "exa" | "firecrawl" | "tavily" | "github" | "bilibili";
+export type ProviderKind = "open-websearch" | "exa" | "firecrawl" | "tavily" | "github" | "bilibili" | "zhihu";
 export type EngineDefinition = {
   provider: ProviderKind;
   requiresProxy: boolean;
@@ -26,6 +26,7 @@ export const engineCatalog: Record<EngineId, EngineDefinition> = {
   tavily: { provider: "tavily", requiresProxy: false, credentialMode: "required", credentialLabel: "Tavily API Key", credentialPlaceholder: "tvly-...", credentialUrl: "https://app.tavily.com/home", defaultEnabled: false, defaultSelected: false, maxResults: 20 },
   github: { provider: "github", requiresProxy: false, credentialMode: "optional", credentialLabel: "GitHub Personal Access Token", credentialPlaceholder: "github_pat_... / ghp_...", credentialUrl: "https://github.com/settings/tokens/new", defaultEnabled: false, defaultSelected: false, maxResults: 50 },
   bilibili: { provider: "bilibili", requiresProxy: false, credentialMode: "none", defaultEnabled: false, defaultSelected: false, maxResults: 20 },
+  zhihu: { provider: "zhihu", requiresProxy: false, credentialMode: "none", defaultEnabled: false, defaultSelected: false, maxResults: 20 },
 };
 
 export type CatalogEngineId = keyof typeof engineCatalog;
