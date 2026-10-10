@@ -12,7 +12,7 @@ import { AuditService } from "../src/services/audit.js";
 import { bootstrapDatabase } from "../src/services/bootstrap.js";
 import { OidcService, resolveOidcAccount } from "../src/services/oidc.js";
 import { LocalAccountService } from "../src/services/local-accounts.js";
-import { SearchService } from "../src/services/search.js";
+import { matchSiteContentUrl, SearchService } from "../src/services/search.js";
 import { SettingsService } from "../src/services/settings.js";
 import { TokenService } from "../src/services/tokens.js";
 import { SlidingWindowRateLimiter } from "../src/services/rate-limiter.js";
@@ -27,6 +27,7 @@ const DAY_MS = 24 * 60 * 60 * 1_000;
 
 class FakeUpstream implements OpenWebSearchClient {
   searches = 0;
+  fetchCalls: string[] = [];
   lastInput?: SearchInput;
   inputs: SearchInput[] = [];
   async health(): Promise<void> {}
@@ -42,12 +43,13 @@ class FakeUpstream implements OpenWebSearchClient {
     };
   }
   async fetchWebContent(input: { url: string; maxChars: number }): Promise<FetchContent> {
+    this.fetchCalls.push(`web:${input.url}`);
     return { url: input.url, finalUrl: input.url, title: "Example", contentType: "text/html", truncated: false, content: "content" };
   }
-  async fetchGithubReadme(): Promise<string> { return "# README"; }
-  async fetchCsdnArticle(): Promise<string> { return "CSDN article"; }
-  async fetchJuejinArticle(): Promise<string> { return "Juejin article"; }
-  async fetchLinuxDoArticle(): Promise<string> { return "Linux.do article"; }
+  async fetchGithubReadme(input: { url: string }): Promise<string> { this.fetchCalls.push(`github:${input.url}`); return "# README"; }
+  async fetchCsdnArticle(input: { url: string }): Promise<string> { this.fetchCalls.push(`csdn:${input.url}`); return "CSDN article"; }
+  async fetchJuejinArticle(input: { url: string }): Promise<string> { this.fetchCalls.push(`juejin:${input.url}`); return "Juejin article"; }
+  async fetchLinuxDoArticle(input: { url: string }): Promise<string> { this.fetchCalls.push(`linuxdo:${input.url}`); return "Linux.do article"; }
 }
 
 const rateLimitedExaFetch: typeof fetch = async () => new Response(JSON.stringify({ error: "rate limited" }), {
@@ -76,7 +78,7 @@ test("migration and bootstrap create default engines without a local administrat
   try {
     await bootstrapDatabase(database, config);
     await bootstrapDatabase(database, config);
-    assert.equal(count(database, "SELECT COUNT(*) AS count FROM engine"), 12);
+    assert.equal(count(database, "SELECT COUNT(*) AS count FROM engine"), 14);
     assert.equal(count(database, "SELECT COUNT(*) AS count FROM engine WHERE id = 'startpage'"), 0);
     assert.equal(count(database, "SELECT COUNT(*) AS count FROM setting"), 22);
     assert.equal(count(database, "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'local_account'"), 1);
@@ -102,7 +104,23 @@ test("bootstrap preserves existing engine defaults and user settings", async () 
   }
 });
 
-test("provider registry maps all twelve engines without sharing user settings", async () => {
+test("bootstrap retires the legacy Zhihu engine and its saved credential", async () => {
+  const { dir, config, database } = setup();
+  try {
+    await bootstrapDatabase(database, config);
+    database.sqlite.prepare("INSERT INTO engine (id, enabled, is_default, status, updated_at) VALUES ('zhihu', 1, 0, 'unknown', ?)").run(new Date().toISOString());
+    database.sqlite.prepare("INSERT INTO setting (key, value, encrypted, updated_at) VALUES ('engine.zhihu.apiKey', ?, 0, ?)").run(JSON.stringify("legacy-cookie"), new Date().toISOString());
+    await bootstrapDatabase(database, config);
+    assert.equal(count(database, "SELECT COUNT(*) AS count FROM engine WHERE id = 'zhihu'"), 0);
+    assert.equal(count(database, "SELECT COUNT(*) AS count FROM setting WHERE key = 'engine.zhihu.apiKey'"), 0);
+    assert.equal(count(database, "SELECT COUNT(*) AS count FROM engine"), 14);
+  } finally {
+    database.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("provider registry maps all configured engines without sharing user settings", async () => {
   const { dir, config, database } = setup();
   try {
     await bootstrapDatabase(database, config);
@@ -110,7 +128,7 @@ test("provider registry maps all twelve engines without sharing user settings", 
     assert.deepEqual(engineIds.map((id) => registry.get(id).engine), [...engineIds]);
     assert.equal(registry.get("tavily").maxResults, 20);
     assert.equal(registry.get("bilibili").maxResults, 20);
-    assert.equal(registry.get("zhihu").maxResults, 20);
+    assert.equal(registry.get("zhihu_official").maxResults, 10);
   } finally {
     database.close();
     rmSync(dir, { recursive: true, force: true });
@@ -306,6 +324,13 @@ test("sensitive settings are encrypted in SQLite", () => {
     const stored = (database.sqlite.prepare("SELECT value FROM setting WHERE key = 'proxy.url'").get() as { value: string }).value;
     assert.equal(stored.includes("secret"), false);
     assert.equal(settings.get<string>("proxy.url"), "http://user:secret@example.test:8080");
+    for (const [key, value] of [["engine.zhihu_official.apiKey", "private-access-secret"], ["feishu.appSecret", "private-app-secret"], ["feishu.oauthToken", "private-refresh-token"]]) {
+      settings.set(key, value);
+      const row = database.sqlite.prepare("SELECT value, encrypted FROM setting WHERE key = ?").get(key) as { value: string; encrypted: number };
+      assert.equal(row.encrypted, 1);
+      assert.equal(row.value.includes(value), false);
+      assert.equal(settings.get<string>(key), value);
+    }
   } finally {
     database.close();
     rmSync(dir, { recursive: true, force: true });
@@ -384,6 +409,44 @@ test("content fetch accepts private and DNS-resolved targets by deployment polic
     assert.equal(result.content.url, "http://127.0.0.1:3210/internal");
     await assert.rejects(() => service.fetchContent("ftp://127.0.0.1/file", 50_000, { channel: "web" }), (error: unknown) => error instanceof DomainError && error.code === "URL_SCHEME_NOT_ALLOWED");
     await assert.rejects(() => service.fetchContent("http://user:password@127.0.0.1/internal", 50_000, { channel: "web" }), (error: unknown) => error instanceof DomainError && error.code === "URL_CREDENTIALS_NOT_ALLOWED");
+    await assert.rejects(() => service.fetchContent("https://www.zhihu.com/question/123", 50_000, { channel: "web" }), (error: unknown) => error instanceof DomainError && error.code === "PLATFORM_URL_UNSUPPORTED");
+    await assert.rejects(() => service.fetchContent("https://zhihu.com/question/123", 50_000, { channel: "mcp" }), (error: unknown) => error instanceof DomainError && error.code === "PLATFORM_URL_UNSUPPORTED");
+    await assert.rejects(() => service.fetchContent("https://m.zhihu.com/question/123", 50_000, { channel: "mcp" }), (error: unknown) => error instanceof DomainError && error.code === "PLATFORM_URL_UNSUPPORTED");
+  } finally {
+    database.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("portal content fetch selects supported site readers and keeps other callers generic", async () => {
+  const { dir, config, database } = setup();
+  try {
+    const upstream = new FakeUpstream();
+    const service = new SearchService(upstream, new AuditService(database), new SettingsService(database, config.settingsEncryptionKey));
+    const cases = [
+      ["https://blog.csdn.net/writer/article/details/123", "csdn", "csdn", "https://blog.csdn.net/writer/article/details/123"],
+      ["https://juejin.cn/post/7520959840199360563", "juejin", "juejin", "https://juejin.cn/post/7520959840199360563"],
+      ["https://linux.do/t/example-topic/12345", "linuxdo", "linuxdo", "https://linux.do/t/topic/12345.json"],
+      ["https://linux.do/topic/67890", "linuxdo", "linuxdo", "https://linux.do/t/topic/67890.json"],
+      ["https://linux.do/t/topic/67890.json", "linuxdo", "linuxdo", "https://linux.do/t/topic/67890.json"],
+      ["https://github.com/example/project", "github", "github", "https://github.com/example/project"],
+    ] as const;
+    for (const [url, source, reader, fetchUrl] of cases) {
+      const result = await service.fetchContent(url, 50_000, { channel: "web", autoMatch: true });
+      assert.equal(result.content.source, source);
+      assert.equal(result.content.url, url);
+      assert.equal(upstream.fetchCalls.at(-1), `${reader}:${fetchUrl}`);
+    }
+    for (const url of ["https://example.com/article", "https://blog.csdn.net.evil.example/writer/article/details/123", "https://juejin.cn/user/123", "https://github.com/example/project/issues", "https://github.com/settings/profile", "http://blog.csdn.net/writer/article/details/123"]) {
+      const result = await service.fetchContent(url, 50_000, { channel: "web", autoMatch: true });
+      assert.equal(result.content.source, undefined);
+      assert.equal(upstream.fetchCalls.at(-1), `web:${url}`);
+    }
+    const normal = await service.fetchContent("https://blog.csdn.net/writer/article/details/123", 50_000, { channel: "web" });
+    assert.equal(normal.content.source, undefined);
+    assert.equal(upstream.fetchCalls.at(-1), "web:https://blog.csdn.net/writer/article/details/123");
+    assert.equal(matchSiteContentUrl("https://linux.do/t/example-topic/12345/2")?.fetchUrl, "https://linux.do/t/topic/12345.json");
+    assert.equal(matchSiteContentUrl("https://linux.do.evil.example/t/example-topic/12345"), null);
   } finally {
     database.close();
     rmSync(dir, { recursive: true, force: true });
@@ -635,17 +698,26 @@ test("management API authenticates a session and returns persisted portal data",
   const cookie = `miaomiao_search_session=${await auth.createSession({ id: "lazycat-user", account: "lazycat-user", name: "Lazycat User", role: "NORMAL", loginMethod: "oidc" })}`;
     const enginesResponse = await app.inject({ method: "GET", url: "/api/engines", headers: { host: "127.0.0.1", cookie: String(cookie).split(";")[0] } });
     assert.equal(enginesResponse.statusCode, 200);
-    assert.equal(enginesResponse.json().engines.length, 12);
+    assert.equal(enginesResponse.json().engines.length, 14);
     const enginePayload = enginesResponse.json().engines as Array<Record<string, unknown>>;
     assert.equal(enginePayload.find((engine) => engine.id === "tavily")?.maxResults, 20);
     assert.equal(enginePayload.find((engine) => engine.id === "github")?.apiKeyOptional, true);
     assert.equal(enginePayload.find((engine) => engine.id === "exa")?.credentialUrl, "https://dashboard.exa.ai/api-keys");
     assert.equal(enginePayload.find((engine) => engine.id === "bilibili")?.supportsApiKey, false);
-    assert.equal(enginePayload.find((engine) => engine.id === "zhihu")?.supportsApiKey, false);
+    assert.equal(enginePayload.find((engine) => engine.id === "zhihu"), undefined);
+    assert.equal(enginePayload.find((engine) => engine.id === "zhihu_official")?.requiresApiKey, true);
+    assert.equal(enginePayload.find((engine) => engine.id === "zhihu_official")?.maxResults, 10);
     assert.equal(enginesResponse.json().engines.find((engine: { id: string }) => engine.id === "brave"), undefined);
     const exaWithoutKey = await app.inject({ method: "PATCH", url: "/api/engines/exa", headers: { host: "127.0.0.1", cookie: String(cookie).split(";")[0] }, payload: { enabled: true } });
     assert.equal(exaWithoutKey.statusCode, 400);
     assert.equal(exaWithoutKey.json().error.code, "ENGINE_API_KEY_REQUIRED");
+    const officialWithoutKey = await app.inject({ method: "PATCH", url: "/api/engines/zhihu_official", headers: { host: "127.0.0.1", cookie: String(cookie).split(";")[0] }, payload: { enabled: true } });
+    assert.equal(officialWithoutKey.json().error.code, "ENGINE_API_KEY_REQUIRED");
+    const officialKey = await app.inject({ method: "PATCH", url: "/api/engines/zhihu_official", headers: { host: "127.0.0.1", cookie: String(cookie).split(";")[0] }, payload: { apiKey: "private-access-secret" } });
+    assert.equal(officialKey.statusCode, 200);
+    assert.equal(officialKey.json().engine.apiKeyConfigured, true);
+    assert.doesNotMatch(officialKey.body, /private-access-secret/);
+    assert.equal((database.sqlite.prepare("SELECT encrypted FROM setting WHERE key = 'engine.zhihu_official.apiKey'").get() as { encrypted: number }).encrypted, 1);
     const exaKey = await app.inject({ method: "PATCH", url: "/api/engines/exa", headers: { host: "127.0.0.1", cookie: String(cookie).split(";")[0] }, payload: { apiKey: "exa-secret-for-test" } });
     assert.equal(exaKey.statusCode, 200);
     assert.equal(exaKey.json().engine.apiKeyConfigured, true);
@@ -782,7 +854,14 @@ test("MCP transport rejects missing bearer credentials and serves an authorized 
     const upstream = new FakeUpstream();
     const audit = new AuditService(database);
     const settings = new SettingsService(database, config.settingsEncryptionKey);
-    const app = buildServer(config, upstream, { database, audit, settings, auth: oidc(config), localAccounts: new LocalAccountService(database), tokens: new TokenService(database, config.tokenHashKey), search: new SearchService(upstream, audit, settings), rateLimiter: new SlidingWindowRateLimiter() });
+    const matched: string[] = [];
+    const platformFetch = { fetch: async (url: string, maxChars?: number) => {
+      matched.push(url);
+      assert.equal(maxChars, 50_000);
+      return { platform: url.includes("xiaohongshu") ? "xiaohongshu" as const : "feishu" as const, sourceUrl: url, title: "平台文章", markdown: "# 平台文章\n正文", images: ["https://example.com/image.jpg"], videoUrls: [], truncated: false, retrievalMethod: "public-page" as const };
+    } };
+    const search = new SearchService(upstream, audit, settings, undefined, undefined, undefined, undefined, undefined, platformFetch);
+    const app = buildServer(config, upstream, { database, audit, settings, auth: oidc(config), localAccounts: new LocalAccountService(database), tokens: new TokenService(database, config.tokenHashKey), search, rateLimiter: new SlidingWindowRateLimiter() });
     await app.ready();
     const response = await app.inject({ method: "POST", url: "/mcp", headers: { host: "127.0.0.1" }, payload: { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "test", version: "1" } } } });
     assert.equal(response.statusCode, 401);
@@ -795,10 +874,31 @@ test("MCP transport rejects missing bearer credentials and serves an authorized 
     const toolsBefore = await app.inject({ method: "POST", url: "/mcp", headers: { host: "127.0.0.1", authorization: `Bearer ${token.secret}`, accept: "application/json, text/event-stream" }, payload: { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} } });
     assert.equal(toolsBefore.statusCode, 200);
     assert.match(toolsBefore.body, /sogou/);
+    assert.match(toolsBefore.body, /fetchPlatformContent/);
+    const platformCall = await app.inject({ method: "POST", url: "/mcp", headers: { host: "127.0.0.1", authorization: `Bearer ${token.secret}`, accept: "application/json, text/event-stream" }, payload: { jsonrpc: "2.0", id: 21, method: "tools/call", params: { name: "fetchPlatformContent", arguments: { url: `https://www.xiaohongshu.com/explore/0123456789abcdef01234567` } } } });
+    assert.equal(platformCall.statusCode, 200);
+    assert.match(platformCall.body, /xiaohongshu/);
+    assert.match(platformCall.body, /平台文章/);
+    const autoCall = await app.inject({ method: "POST", url: "/mcp", headers: { host: "127.0.0.1", authorization: `Bearer ${token.secret}`, accept: "application/json, text/event-stream" }, payload: { jsonrpc: "2.0", id: 22, method: "tools/call", params: { name: "fetchWebContent", arguments: { url: "https://team.feishu.cn/docx/ABC123" } } } });
+    assert.equal(autoCall.statusCode, 200);
+    assert.match(autoCall.body, /text\/markdown/);
+    assert.match(autoCall.body, /feishu/);
+    const genericCall = await app.inject({ method: "POST", url: "/mcp", headers: { host: "127.0.0.1", authorization: `Bearer ${token.secret}`, accept: "application/json, text/event-stream" }, payload: { jsonrpc: "2.0", id: 23, method: "tools/call", params: { name: "fetchWebContent", arguments: { url: "https://example.com/article" } } } });
+    assert.equal(genericCall.statusCode, 200);
+    assert.match(genericCall.body, /Example/);
+    const portalPlatform = await search.fetchContent("https://www.xiaohongshu.com/explore/0123456789abcdef01234567", 50_000, { channel: "web", autoMatch: true });
+    assert.equal(portalPlatform.content.platform, "xiaohongshu");
+    assert.deepEqual(portalPlatform.content.images, ["https://example.com/image.jpg"]);
+    assert.equal(matched.length, 3);
+    assert.equal(audit.listLogs().filter((entry) => entry.channel === "mcp" && entry.operation === "fetchPlatformContent").length, 2);
+    const searchOnlyToken = new TokenService(database, config.tokenHashKey).create({ name: "Search only", scope: "search" });
+    const deniedFetch = await app.inject({ method: "POST", url: "/mcp", headers: { host: "127.0.0.1", authorization: `Bearer ${searchOnlyToken.secret}`, accept: "application/json, text/event-stream" }, payload: { jsonrpc: "2.0", id: 24, method: "tools/call", params: { name: "fetchPlatformContent", arguments: { url: "https://team.feishu.cn/docx/ABC123" } } } });
+    assert.match(deniedFetch.body, /TOKEN_SCOPE_DENIED|Token 没有此操作权限/);
+    assert.equal(matched.length, 3);
     database.sqlite.prepare("UPDATE engine SET enabled = 0 WHERE id = 'sogou'").run();
     const toolsAfter = await app.inject({ method: "POST", url: "/mcp", headers: { host: "127.0.0.1", authorization: `Bearer ${token.secret}`, accept: "application/json, text/event-stream" }, payload: { jsonrpc: "2.0", id: 3, method: "tools/list", params: {} } });
     assert.equal(toolsAfter.statusCode, 200);
-    assert.doesNotMatch(toolsAfter.body, /sogou/);
+    assert.doesNotMatch(toolsAfter.body, /sources: [^"]*\bsogou/i);
     const searchCall = await app.inject({ method: "POST", url: "/mcp", headers: { host: "127.0.0.1", authorization: `Bearer ${token.secret}`, accept: "application/json, text/event-stream" }, payload: { jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "search", arguments: { query: "lazycat", engines: ["bing"], limit: 3 } } } });
     assert.equal(searchCall.statusCode, 200);
     assert.match(searchCall.body, /engineResults/);

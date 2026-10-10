@@ -17,7 +17,12 @@ export const engineCatalog: Record<string, EngineCatalogEntry> = {
   tavily: { id: "tavily", name: "Tavily", iconUrl: "https://tavily.com/favicon.ico", tagClass: "engine-tag-tavily" },
   github: { id: "github", name: "GitHub", iconUrl: "https://github.com/favicon.ico", tagClass: "engine-tag-github" },
   bilibili: { id: "bilibili", name: "Bilibili", iconUrl: "https://www.bilibili.com/favicon.ico", tagClass: "engine-tag-bilibili" },
-  zhihu: { id: "zhihu", name: "知乎", iconUrl: "https://zhuanlan.zhihu.com/favicon.ico", tagClass: "engine-tag-zhihu" },
+  zhihu_official: { id: "zhihu_official", name: "知乎官方 CLI", iconUrl: "https://zhuanlan.zhihu.com/favicon.ico", tagClass: "engine-tag-zhihu" },
+  feishu: { id: "feishu", name: "飞书", iconUrl: "https://www.feishu.cn/favicon.ico", tagClass: "engine-tag-feishu" },
+  xiaohongshu: { id: "xiaohongshu", name: "Xiaohongshu", iconUrl: "https://www.xiaohongshu.com/favicon.ico", tagClass: "engine-tag-xiaohongshu" },
+  linuxdo: { id: "linuxdo", name: "Linux.do", iconUrl: "/engine-icons/linuxdo.png", tagClass: "engine-tag-linuxdo" },
+  wechat: { id: "wechat", name: "微信公众号", iconUrl: "https://mp.weixin.qq.com/favicon.ico", tagClass: "engine-tag-wechat" },
+  webpage: { id: "webpage", name: "Web page", iconUrl: "", tagClass: "engine-tag-unknown" },
 };
 
 export function getEngineMeta(value: string): EngineCatalogEntry {

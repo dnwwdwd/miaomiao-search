@@ -6,7 +6,7 @@ import { settings } from "../db/schema.js";
 import { engineApiKeySetting, engineCatalog } from "../engine-catalog.js";
 import { engineIds } from "../domain.js";
 
-const sensitiveKeys = new Set(["proxy.url", ...engineIds.filter((id) => engineCatalog[id].credentialMode !== "none").map(engineApiKeySetting)]);
+const sensitiveKeys = new Set(["proxy.url", "feishu.appSecret", "feishu.oauthToken", "feishu.oauthPending", ...engineIds.filter((id) => engineCatalog[id].credentialMode !== "none").map(engineApiKeySetting)]);
 
 export class SettingsService {
   constructor(private readonly database: AppDatabase, private readonly encryptionKey: Buffer) {}

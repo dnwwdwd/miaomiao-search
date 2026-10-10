@@ -11,6 +11,7 @@ import { usePortal } from "@/components/portal/portal-context";
 
 const navigation: Array<{ id: PortalTab; zh: string; en: string; icon: string }> = [
   { id: "search", zh: "联网搜索", en: "Web search", icon: "magnifying-glass" },
+  { id: "content", zh: "内容抓取", en: "Content fetch", icon: "article" },
   { id: "mcp", zh: "MCP 服务", en: "MCP service", icon: "plugs-connected" },
   { id: "engines", zh: "引擎管理", en: "Engine management", icon: "cpu" },
   { id: "usage", zh: "统计审计", en: "Usage audit", icon: "chart-line-up" },

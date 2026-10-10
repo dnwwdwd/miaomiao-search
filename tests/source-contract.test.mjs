@@ -1,8 +1,17 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { extractPlatformUrl } from "../src/lib/platform-url.ts";
 
 const read = (file) => readFile(new URL(`../${file}`, import.meta.url), "utf8");
+
+test("内容抓取可从分享文案和 Markdown 链接提取完整小红书 URL", () => {
+  const url = "https://www.xiaohongshu.com/discovery/item/6ab0f6e40000000031013c5d?source=webshare&xhsshare=pc_web&xsec_token=AB4r8TDejFmP5EDA2Pt2gT-0lw_Eu767gRJ9FKEFHojnE=&xsec_source=pc_share";
+  assert.equal(extractPlatformUrl(`18 【折腾AI两年】 😆 ${url}`), url);
+  const escaped = url.replaceAll("&", String.raw`\&`).replaceAll("_", String.raw`\_`);
+  assert.equal(extractPlatformUrl(`[${escaped}](${escaped})`), url);
+  assert.equal(new URL(extractPlatformUrl(`[${escaped}](${escaped})`)).searchParams.get("xsec_token"), "AB4r8TDejFmP5EDA2Pt2gT-0lw_Eu767gRJ9FKEFHojnE=");
+});
 
 test("门户入口引用 Next.js JSX 页面", async () => {
   const [entry, portal] = await Promise.all([
@@ -274,8 +283,10 @@ test("四类新增搜索源贯穿门户目录、封面和凭据契约", async ()
     assert.match(catalog, new RegExp(`${id}:`));
     assert.match(serverCatalog, new RegExp(`${id}:`));
   }
-  assert.match(catalog, /zhihu:/);
-  assert.match(serverCatalog, /zhihu:/);
+  assert.match(catalog, /zhihu_official:/);
+  assert.match(serverCatalog, /zhihu_official:/);
+  assert.doesNotMatch(catalog, /^\s*zhihu:/m);
+  assert.doesNotMatch(serverCatalog, /^\s*zhihu:/m);
   assert.match(types, /thumbnailUrl\?: string/);
   assert.match(types, /videoMeta\?:/);
   assert.match(types, /apiKeyOptional: boolean/);
@@ -288,8 +299,7 @@ test("四类新增搜索源贯穿门户目录、封面和凭据契约", async ()
   assert.match(page, /Thumbnail/);
   assert.match(page, /Bilibili video details/);
   assert.match(page, /setVideoResult/);
-  assert.match(page, /Zhihu article/);
-  assert.match(page, /readerIsZhihu/);
+  assert.match(page, /window\.open\(url, "_blank", "noopener,noreferrer"\)/);
   for (const tag of ["firecrawl", "tavily", "github", "bilibili"]) assert.match(styles, new RegExp(`engine-tag-${tag}`));
   assert.match(styles, /engine-tag-zhihu/);
 });
@@ -314,17 +324,17 @@ test("门户交互保留浮层、最后来源提示和凭据申请入口", async
   assert.match(serverCatalog, /https:\/\/dashboard\.exa\.ai\/api-keys/);
 });
 
-test("知乎实验源保留站内查询、回退和正文错误契约", async () => {
-  const [provider, errors, business] = await Promise.all([
-    read("packages/server/src/providers/zhihu-provider.ts"),
+test("知乎搜索使用官方 CLI，内容抓取页展示支持来源", async () => {
+  const [provider, errors, contentPage] = await Promise.all([
+    read("packages/server/src/providers/zhihu-official-provider.ts"),
     read("src/components/portal/error-message.tsx"),
-    read("docs/SEARCH_AND_MCP_BUSINESS_FLOW.md"),
+    read("src/components/portal/pages/content-page.tsx"),
   ]);
-  assert.match(provider, /site:\$\{zhihuHost\}/);
-  assert.match(provider, /engines: \["bing"\].*searchMode: "request"/s);
-  assert.match(provider, /engines: \["baidu"\]/);
-  assert.match(provider, /ZHIHU_SEARCH_UNAVAILABLE/);
-  assert.match(errors, /ZHIHU_SEARCH_UNAVAILABLE/);
-  assert.match(business, /知乎站内搜索无结果/);
-  assert.match(business, /CONTENT_NOT_EXTRACTED/);
+  assert.match(provider, /runZhihuOfficialCli/);
+  assert.match(provider, /ZHIHU_ACCESS_SECRET/);
+  assert.match(errors, /ZHIHU_CLI_FAILED/);
+  assert.match(contentPage, /Supported sources/);
+  assert.match(contentPage, /from "@\/components\/ui\/engine-tag"/);
+  assert.match(contentPage, /<EngineTag /);
+  assert.doesNotMatch(contentPage, /Paste a supported link|粘贴支持的平台链接/);
 });

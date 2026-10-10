@@ -12,7 +12,9 @@ export const initialEngines: SearchEngine[] = [
   { id: "tavily", name: "Tavily", enabled: false, isDefault: false, mode: "—", resultLimit: null, health: "Disabled", latency: null, lastError: "需要配置 API Key", lastTestAt: "—", requiresProxy: false, requiresApiKey: true, supportsApiKey: true, apiKeyOptional: false, apiKeyConfigured: false, credentialLabel: "Tavily API Key", credentialPlaceholder: "tvly-...", credentialUrl: "https://app.tavily.com/home", maxResults: 20 },
   { id: "github", name: "GitHub", enabled: false, isDefault: false, mode: "—", resultLimit: null, health: "Disabled", latency: null, lastError: "Token 可选", lastTestAt: "—", requiresProxy: false, requiresApiKey: false, supportsApiKey: true, apiKeyOptional: true, apiKeyConfigured: false, credentialLabel: "GitHub Personal Access Token", credentialPlaceholder: "github_pat_... / ghp_...", credentialUrl: "https://github.com/settings/tokens/new", maxResults: 50 },
   { id: "bilibili", name: "Bilibili", enabled: false, isDefault: false, mode: "—", resultLimit: null, health: "Disabled", latency: null, lastError: "无需密钥", lastTestAt: "—", requiresProxy: false, requiresApiKey: false, supportsApiKey: false, apiKeyOptional: false, apiKeyConfigured: false, maxResults: 20 },
-  { id: "zhihu", name: "知乎", enabled: false, isDefault: false, mode: "—", resultLimit: null, health: "Disabled", latency: null, lastError: "无需密钥；实验性站内搜索", lastTestAt: "—", requiresProxy: false, requiresApiKey: false, supportsApiKey: false, apiKeyOptional: false, apiKeyConfigured: false, maxResults: 20 },
+  { id: "zhihu_official", name: "知乎官方 CLI", enabled: false, isDefault: false, mode: "—", resultLimit: null, health: "Disabled", latency: null, lastError: "需要 Access Secret", lastTestAt: "—", requiresProxy: false, requiresApiKey: true, supportsApiKey: true, apiKeyOptional: false, apiKeyConfigured: false, maxResults: 10 },
+  { id: "feishu", name: "飞书", enabled: false, isDefault: false, mode: "—", resultLimit: null, health: "Disabled", latency: null, lastError: "需要飞书 OAuth", lastTestAt: "—", requiresProxy: false, requiresApiKey: false, supportsApiKey: false, apiKeyOptional: false, apiKeyConfigured: false, maxResults: 20 },
+  { id: "wechat", name: "微信公众号", enabled: false, isDefault: false, mode: "—", resultLimit: null, health: "Disabled", latency: null, lastError: "管理员已停用", lastTestAt: "—", requiresProxy: false, requiresApiKey: false, supportsApiKey: false, apiKeyOptional: false, apiKeyConfigured: false, maxResults: 10 },
 ];
 
 export const initialResults: SearchResult[] = [
@@ -30,6 +32,7 @@ export const initialHistory: SearchHistory[] = [
 export const initialTools: McpTool[] = [
   { id: "search", name: "search", description: "多引擎分组与聚合搜索", parameters: "query, limit?, engines, searchMode", enabled: true },
   { id: "fetchWebContent", name: "fetchWebContent", description: "抓取通用网页正文", parameters: "url, maxChars", enabled: true },
+  { id: "fetchPlatformContent", name: "fetchPlatformContent", description: "按链接识别平台并抓取正文", parameters: "url, maxChars", enabled: true },
   { id: "fetchCsdnArticle", name: "fetchCsdnArticle", description: "读取 CSDN 文章正文", parameters: "url", enabled: true, siteSpecific: true },
   { id: "fetchJuejinArticle", name: "fetchJuejinArticle", description: "读取掘金文章正文", parameters: "url", enabled: true, siteSpecific: true },
   { id: "fetchGithubReadme", name: "fetchGithubReadme", description: "读取 GitHub README", parameters: "url", enabled: true, siteSpecific: true },
@@ -51,7 +54,7 @@ export const initialUsageLogs: UsageLog[] = [
   { id: "req_01HZYKX2", channel: "Web", operation: "search", token: "—", engines: ["Sogou"], latency: 0, cacheHit: false, resultCount: 0, status: "Error", errorCode: "ENGINE_RATE_LIMIT", createdAt: "2026-08-23 15:12:35" },
 ];
 
-export const initialSettings: SettingsState = { proxyEnabled: true, proxyUrl: "http://admin:••••••••@10.0.0.5:7890", searchCacheEnabled: true, contentCacheEnabled: true, searchTtl: 3600, contentTtl: 86400, cacheMaxSize: 1000, webRpm: 30, mcpRpm: 60, engineConcurrency: 3, defaultLimit: 10, homeEngines: [], homeEngineOrder: ["bing", "baidu", "duckduckgo", "exa", "csdn", "juejin", "sogou", "firecrawl", "tavily", "github", "bilibili", "zhihu"], mcpEngineOrder: ["bing", "baidu", "duckduckgo", "exa", "csdn", "juejin", "sogou", "firecrawl", "tavily", "github", "bilibili", "zhihu"], homeRequestLimit: null, homeBingMode: "request", historyEnabled: true, historyRetentionDays: 30, logFullQuery: false };
+export const initialSettings: SettingsState = { proxyEnabled: true, proxyUrl: "http://admin:••••••••@10.0.0.5:7890", searchCacheEnabled: true, contentCacheEnabled: true, searchTtl: 3600, contentTtl: 86400, cacheMaxSize: 1000, webRpm: 30, mcpRpm: 60, engineConcurrency: 3, defaultLimit: 10, homeEngines: [], homeEngineOrder: ["bing", "baidu", "duckduckgo", "exa", "csdn", "juejin", "sogou", "firecrawl", "tavily", "github", "bilibili", "zhihu_official", "feishu", "wechat"], mcpEngineOrder: ["bing", "baidu", "duckduckgo", "exa", "csdn", "juejin", "sogou", "firecrawl", "tavily", "github", "bilibili", "zhihu_official", "feishu", "wechat"], homeRequestLimit: null, homeBingMode: "request", historyEnabled: true, historyRetentionDays: 30, logFullQuery: false };
 
 export const clientTemplates: Record<string, string> = {
   "WorkBuddy": `{

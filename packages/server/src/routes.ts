@@ -15,12 +15,15 @@ import { ownerIdForGateway, type LocalAccountService } from "./services/local-ac
 import type { AppDatabase } from "./db/client.js";
 import { engineApiKeySetting, engineCatalog } from "./engine-catalog.js";
 import type { UserStore, UserStoreManager } from "./services/user-stores.js";
+import { FeishuConnectionService } from "./services/feishu-connection.js";
+import { PlatformContentService } from "./services/platform-content.js";
+import { WechatContentService } from "./services/wechat-content.js";
 
 const sessionCookie = "miaomiao_search_session";
 const oidcStateCookie = "miaomiao_search_oidc_state";
 const oidcCallbackSchema = z.object({ code: z.string().min(1).max(10_000), state: z.string().min(1).max(1_000), error: z.string().max(200).optional() });
 const searchSchema = z.object({ query: z.string().min(1).max(500), engines: z.array(z.enum(engineIds)).min(1).max(engineIds.length), limit: z.number().int().min(1).max(50).optional(), searchMode: z.enum(["auto", "request"]).optional() });
-const fetchSchema = z.object({ url: z.string().url(), maxChars: z.number().int().min(1_000).max(200_000).default(50_000) });
+const fetchSchema = z.object({ url: z.string().url(), maxChars: z.number().int().min(1_000).max(200_000).default(50_000), autoMatch: z.boolean().optional() });
 const usageQuerySchema = z.object({ from: z.string().datetime({ offset: true }).optional(), to: z.string().datetime({ offset: true }).optional(), channel: z.enum(["all", "web", "mcp"]).default("all"), operation: z.string().trim().max(120).optional(), status: z.enum(["all", "success", "partial", "error"]).default("all"), engine: z.enum(engineIds).optional(), page: z.coerce.number().int().min(1).default(1), pageSize: z.coerce.number().int().min(1).max(100).default(20), timeZone: z.string().trim().min(1).max(100).default("Asia/Shanghai") });
 const sanitizeEngineIds = (value: unknown): EngineId[] => Array.isArray(value) ? [...new Set(value.filter((item): item is EngineId => typeof item === "string" && (engineIds as readonly string[]).includes(item)))] : [];
 const settingsSchema = z.object({ proxyEnabled: z.boolean(), proxyUrl: z.string().max(2_000), searchCacheEnabled: z.boolean(), contentCacheEnabled: z.boolean(), searchTtl: z.number().int().min(1).max(604_800), contentTtl: z.number().int().min(1).max(2_592_000), cacheMaxSize: z.number().int().min(1).max(10_000), webRpm: z.number().int().min(1).max(10_000), mcpRpm: z.number().int().min(1).max(10_000), engineConcurrency: z.number().int().min(1).max(100), defaultLimit: z.number().int().min(1).max(50), homeEngines: z.array(z.string()).default([]).transform(sanitizeEngineIds), homeEngineOrder: z.array(z.string()).default([]).transform(sanitizeEngineIds), mcpEngineOrder: z.array(z.string()).default([]).transform(sanitizeEngineIds), homeRequestLimit: z.number().int().min(1).max(50).nullable().default(null), homeBingMode: z.enum(["auto", "request"]).default("request"), historyEnabled: z.boolean(), historyRetentionDays: z.number().int().min(-1).max(3650), logFullQuery: z.boolean() });
@@ -217,7 +220,58 @@ export function registerAdminRoutes(app: FastifyInstance, config: ServerConfig, 
     try { const context = portalContext(request); context.store.rateLimiter.assert(`web:${context.ownerId}:${request.ip}`, context.store.settings.get<number>("rateLimit.web.rpm") ?? 30); return await context.store.search.search(searchSchema.parse(request.body), { channel: "web" }); } catch (error) { const response = errorBody(error); return reply.code(response.status).send(response.body); }
   });
   app.post("/api/fetch-content", { preHandler: portalUser, config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request, reply) => {
-    try { const context = portalContext(request); context.store.rateLimiter.assert(`web:${context.ownerId}:${request.ip}`, context.store.settings.get<number>("rateLimit.web.rpm") ?? 30); const input = fetchSchema.parse(request.body); return await context.store.search.fetchContent(input.url, input.maxChars, { channel: "web" }); } catch (error) { const response = errorBody(error); return reply.code(response.status).send(response.body); }
+    try { const context = portalContext(request); context.store.rateLimiter.assert(`web:${context.ownerId}:${request.ip}`, context.store.settings.get<number>("rateLimit.web.rpm") ?? 30); const input = fetchSchema.parse(request.body); return await context.store.search.fetchContent(input.url, input.maxChars, { channel: "web", autoMatch: input.autoMatch }); } catch (error) { const response = errorBody(error); return reply.code(response.status).send(response.body); }
+  });
+
+  app.post("/api/platform-content", { preHandler: portalUser, config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request, reply) => {
+    const startedAt = Date.now();
+    const context = portalContext(request);
+    try {
+      context.store.rateLimiter.assert(`web:${context.ownerId}:${request.ip}`, context.store.settings.get<number>("rateLimit.web.rpm") ?? 30);
+      const input = fetchSchema.parse(request.body);
+      const content = await new PlatformContentService(context.store.settings).fetch(input.url, input.maxChars);
+      const requestId = context.store.audit.record({ channel: "web", operation: "fetchPlatformContent", latencyMs: Date.now() - startedAt, cacheHit: false, resultCount: 1, status: "success" });
+      return { content, requestId };
+    } catch (error) {
+      context.store.audit.record({ channel: "web", operation: "fetchPlatformContent", latencyMs: Date.now() - startedAt, cacheHit: false, status: "error", errorCode: error instanceof DomainError ? error.code : "FETCH_FAILED" });
+      const response = errorBody(error); return reply.code(response.status).send(response.body);
+    }
+  });
+
+  app.post("/api/wechat/discover", { preHandler: portalUser, config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request, reply) => {
+    const startedAt = Date.now();
+    const context = portalContext(request);
+    try {
+      context.store.rateLimiter.assert(`web:${context.ownerId}:${request.ip}`, context.store.settings.get<number>("rateLimit.web.rpm") ?? 30);
+      const input = z.object({ query: z.string().min(1).max(500), limit: z.number().int().min(1).max(20).default(10), source: z.enum(["sogou", "mirror"]).default("sogou") }).parse(request.body);
+      const result = await new WechatContentService().searchArticles(input);
+      const requestId = context.store.audit.record({ channel: "web", operation: "searchWechatArticles", query: input.query, latencyMs: Date.now() - startedAt, cacheHit: false, resultCount: result.items.filter((item) => item.resolved).length, status: result.failure ? "partial" : "success", errorCode: result.failure?.code });
+      return { result, requestId };
+    } catch (error) {
+      context.store.audit.record({ channel: "web", operation: "searchWechatArticles", latencyMs: Date.now() - startedAt, cacheHit: false, status: "error", errorCode: error instanceof DomainError ? error.code : "SEARCH_FAILED" });
+      const response = errorBody(error); return reply.code(response.status).send(response.body);
+    }
+  });
+
+  app.get("/api/feishu/connection", { preHandler: portalUser }, async (request) => ({ connection: new FeishuConnectionService(portalContext(request).store.settings).status() }));
+  app.put("/api/feishu/connection", { preHandler: portalUser }, async (request, reply) => {
+    try {
+      const context = portalContext(request);
+      const input = z.object({ appId: z.string().max(120), appSecret: z.string().max(500) }).parse(request.body);
+      const service = new FeishuConnectionService(context.store.settings);
+      service.configure(input.appId, input.appSecret);
+      context.store.search.clearSearchCache();
+      return { connection: service.status() };
+    } catch (error) { const response = errorBody(error); return reply.code(response.status).send(response.body); }
+  });
+  app.delete("/api/feishu/connection", { preHandler: portalUser }, async (request) => { const context = portalContext(request); const service = new FeishuConnectionService(context.store.settings); service.clear(); context.store.search.clearSearchCache(); return { connection: service.status() }; });
+  app.post("/api/feishu/oauth/start", { preHandler: portalUser, config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request, reply) => {
+    try { return await new FeishuConnectionService(portalContext(request).store.settings).begin(); }
+    catch (error) { const response = errorBody(error); return reply.code(response.status).send(response.body); }
+  });
+  app.post("/api/feishu/oauth/poll", { preHandler: portalUser, config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request, reply) => {
+    try { const context = portalContext(request); const result = await new FeishuConnectionService(context.store.settings).poll(); if (result.status === "connected") context.store.search.clearSearchCache(); return result; }
+    catch (error) { const response = errorBody(error); return reply.code(response.status).send(response.body); }
   });
 
   app.get("/api/engines", { preHandler: portalUser }, async (request) => { const context = portalContext(request); return { engines: context.store.database.orm.select().from(engines).all().map((engine) => engineResponse(engine.id, engine, context.store.settings)) }; });
@@ -309,7 +363,7 @@ export function registerAdminRoutes(app: FastifyInstance, config: ServerConfig, 
   });
   app.get("/api/mcp", { preHandler: portalUser }, async (request) => { const context = portalContext(request); return { endpoint: "/mcp", healthy: true, legacySse: context.store.settings.get<boolean>("mcp.legacySse") ?? false, tools: mcpTools.map((tool) => ({ ...tool, enabled: getMcpTools(context.store.settings)[tool.name] })) }; });
   app.put("/api/mcp/tools", { preHandler: portalUser }, async (request, reply) => {
-    try { const context = portalContext(request); const tools = z.record(z.enum(mcpTools.map((tool) => tool.name) as [string, ...string[]]), z.boolean()).parse(request.body); context.store.settings.set("mcp.tools", { ...getMcpTools(context.store.settings), ...tools }); return { tools: mcpTools.map((tool) => ({ ...tool, enabled: getMcpTools(context.store.settings)[tool.name] })) }; } catch (error) { const response = errorBody(error); return reply.code(response.status).send(response.body); }
+    try { const context = portalContext(request); const tools = z.partialRecord(z.enum(mcpTools.map((tool) => tool.name) as [string, ...string[]]), z.boolean()).parse(request.body); context.store.settings.set("mcp.tools", { ...getMcpTools(context.store.settings), ...tools }); return { tools: mcpTools.map((tool) => ({ ...tool, enabled: getMcpTools(context.store.settings)[tool.name] })) }; } catch (error) { const response = errorBody(error); return reply.code(response.status).send(response.body); }
   });
 }
 

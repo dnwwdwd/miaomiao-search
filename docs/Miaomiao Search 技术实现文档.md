@@ -576,7 +576,7 @@ export function getLogs(params: { page, pageSize, channel?, operation?, tokenId?
 
 ### 4.9 Provider Registry 与外部搜索源
 
-`packages/server/src/providers/registry.ts` 为每个用户实例创建 Provider。六个旧引擎使用 `OpenWebSearchProvider`，Exa、Firecrawl、Tavily、GitHub 和 Bilibili 在 Fastify 内直接访问固定 HTTPS Endpoint：Exa `/search`、Firecrawl `/v2/search`、Tavily `/search`、GitHub REST `search.repos` 和 Bilibili `/x/web-interface/search/all/v2`。知乎由 `ZhihuProvider` 组合调用 daemon 的 Bing/Baidu，构造 `site:zhuanlan.zhihu.com` 并做精确主机过滤。通用 HTTP 工具支持可注入 `fetch`、超时、2 MiB 响应体上限、禁止自动重定向，并在非 2xx 时保留状态码与响应头；不会记录 Authorization、Cookie、完整响应体或带敏感信息的请求 URL。
+`packages/server/src/providers/registry.ts` 为每个用户实例创建 Provider。六个旧引擎使用 `OpenWebSearchProvider`，Exa、Firecrawl、Tavily、GitHub 和 Bilibili 在 Fastify 内直接访问固定 HTTPS Endpoint：Exa `/search`、Firecrawl `/v2/search`、Tavily `/search`、GitHub REST `search.repos` 和 Bilibili `/x/web-interface/search/all/v2`。独立的知乎官方 CLI 引擎由 `ZhihuOfficialProvider` 调用官方 `search zhihu`；飞书由 `FeishuProvider` 调用官方文档搜索接口。通用 HTTP 工具支持可注入 `fetch`、超时、2 MiB 响应体上限、禁止自动重定向，并在非 2xx 时保留状态码与响应头；不会记录 Authorization、Cookie、完整响应体或带敏感信息的请求 URL。
 
 Exa、Firecrawl 与 Tavily 从当前用户的 `SettingsService` 读取加密 API Key；GitHub 使用 `@octokit/rest`，查询追加 `is:public`，只返回公共仓库并按 Token 变化重建 Client。Exa 的 Web/MCP 请求直接由 Fastify 发往官方 Search API，不依赖 `EXA_API_KEY` 环境变量。Bilibili 不使用登录态，首次 HTTP 412 或 `code=-412` 时只做一次首页匿名 Cookie 预热和一次重试，Cookie 只存在单次调用内存中。Bilibili 结果只接受视频分组，过滤直播条目，清理 HTML/实体并校验 `thumbnailUrl` 必须是无凭据 HTTPS `*.hdslb.com` URL，同时透传作者、时长、播放、点赞、收藏、评论和发布时间等可选 `videoMeta`。
 
@@ -979,10 +979,37 @@ Fastify 为每个用户实例创建 `SearchProviderRegistry`。六个旧引擎�
 
 Exa、Firecrawl 与 Tavily 使用当前用户的加密 Key，GitHub Token 可选且查询固定追加 `is:public` 并过滤私有仓库；Bilibili 不读取登录态。Bilibili 首次收到 HTTP 412 或响应 `code=-412` 时只做一次匿名首页 Cookie 预热和一次重试，Cookie 只存在本次调用内存中。通用 HTTP 工具限制 20 秒级超时、2 MiB 响应体、禁止自动重定向，并保留非 2xx 状态码和响应头用于 Provider 错误映射。
 
-MCP `search` Tool 名称与返回结构保持不变，工具描述和引擎枚举按当前用户启用状态及 MCP 顺序动态生成。引擎管理 API 返回凭据模式、标签、占位符和 Provider `maxResults`；必需 Key、可选 Token、Bilibili/知乎无凭据和健康状态映射均由服务端校验。默认 CI 使用注入的 fetch/Octokit Client 测试，不访问真实外部 API。
+MCP `search` Tool 名称与返回结构保持不变，工具描述和引擎枚举按当前用户启用状态及 MCP 顺序动态生成。引擎管理 API 返回凭据模式、标签、占位符和 Provider `maxResults`；必需 Key、可选 Token、Bilibili 无凭据和健康状态映射均由服务端校验。默认 CI 使用注入的 fetch/Octokit Client 测试，不访问真实外部 API。
 
 ### 11.1 知乎站内搜索实验（2026-09-13）
 
-知乎不接入官方搜索 API、CLI Token 或 Cookie。`packages/server/src/providers/zhihu-provider.ts` 构造 `site:zhuanlan.zhihu.com <query>`，先调用 Open-WebSearch daemon 的 Bing request 模式；过滤精确 `zhuanlan.zhihu.com` 主机后，若无匹配结果再请求 Baidu。结果统一写入 `engines: ["zhihu"]`，Provider 上限为 20 条，首次 bootstrap 为关闭且非默认，不新增数据库字段或迁移。
+2026-09-25 起，搜索目录只保留 `zhihu_official`。`ZhihuOfficialProvider` 调用官方 CLI 的 `search zhihu`，上限为 10 条；当前用户在引擎管理配置 Access Secret。已有 `zhihu` 引擎行和对应 Cookie 设置在 bootstrap 时删除。
 
-知乎正文沿用 `SearchService.fetchContent` 和通用 `fetch-web`，因此继续具备 HTTP(S)/无凭据校验、重定向和响应体/正文上限、Readability、结构化数据和 Playwright 浏览器回退。门户仅在阅读器中增加知乎标题、Tag 和“打开知乎”按钮；页面可访问但无正文时仍返回 `CONTENT_NOT_EXTRACTED`，显示重试与打开源站入口。在线 POC 受 Bing 索引、知乎 403 challenge 和目标运行时系统依赖影响，详见 `docs/Requirements/REQ-20260913-001-zhihu-search-source.md`。
+知乎官方 CLI 搜索结果包含可选 `zhihuMeta`（内容类型、作者、赞同、评论、更新时间），结果点击后展示摘要详情并提供源站入口；摘要不当作全文。官方 `zhihu_search` 文档列出 `20001` 鉴权失败、`30001` 频率限制；CLI 错误文档还列出 `30002` 配额耗尽。Provider 将这些错误映射为固定错误码，不向 API 传递 CLI 原始输出；Web 错误组件默认显示本地化摘要，详情折叠展示固定服务端消息。历史实验过程见 `docs/Requirements/REQ-20260913-001-zhihu-search-source.md`。
+
+## 12. 小红书与飞书内容抓取及飞书 OAuth（2026-09-25）
+
+`/api/platform-content` 在当前门户会话和限流下调用 `PlatformContentService`。入口校验 HTTPS、无 URL 凭据、固定平台主机与路径；小红书短链仅允许受控主机的手动重定向，SSR 状态解析保留字符串内的 `undefined` 等内容；飞书官方路径使用 Docx `raw_content` 与文档块列表，公开分享页回退使用 Chromium 并限制资源主机及最终文档 URL。返回统一的 Markdown、元数据与截断标记。
+
+飞书自建应用 ID/Secret、OAuth access/refresh token 和设备码保存在当前用户的加密设置中；`/api/feishu/connection` 配置或清除连接，`/api/feishu/oauth/start` 与 `/poll` 完成设备流。`FeishuProvider` 在用户授权范围内调用 `search/v2/doc_wiki/search`。内容页使用 `/api/fetch-content` 自动匹配抓取器，并用 Blob 生成 Markdown 下载。`lzc-manifest.yml` 注入文件选择器，并通过 `lzc/build-package.sh` 收录脚本。当前尚未用真实飞书账号或懒猫设备验证端到端结果。
+
+### 门户内容抓取自动匹配（2026-09-28）
+
+内容页通过现有 `/api/fetch-content` 提交 `autoMatch: true`。`SearchService.fetchContent` 先识别小红书和飞书，再按精确 HTTPS 主机和内容路径匹配 CSDN、掘金、Linux.do、GitHub 仓库；其他链接调用通用 `fetchWebContent`。Linux.do 的 `/t/<slug>/<id>` 转为专用上游可用的 `/t/topic/<id>.json`，结果保留输入 URL。响应中的 `platform` 或 `source` 用于页面来源标签；平台媒体继续随响应返回。未传 `autoMatch` 的门户搜索页阅读器及 MCP 行为保持原有路径，`/api/platform-content` 仍可单独使用。专用抓取器返回的文本按当前结果生成 Markdown 文件，不补造媒体链接。
+
+### MCP 平台内容自动分流（2026-09-25）
+
+`mcp.ts` 新增 `fetchPlatformContent(url,maxChars?)`，沿用 Fetch scope；`SearchService.fetchPlatformContent` 复用用户级 `PlatformContentService` 并记录 MCP 审计。`fetchWebContent` 对 `identifyPlatformContentUrl` 识别的小红书、飞书内容 URL 走相同服务，将 Markdown 与平台元数据映射到兼容的 `FetchContent`；普通 URL 仍使用 Open-WebSearch。识别函数限制 HTTPS、无 URL 凭据、固定主机与内容路径，平台服务继续校验跳转、权限、正文和响应大小。平台正文不进入通用内容缓存。
+
+## 13. 微信公众号抓取与文章发现（2026-10-10）
+
+`WechatContentService`（`packages/server/src/services/wechat-content.ts`）提供两条能力，整体移植自参考项目 wechat-notebank 的公开页面路线，不调用微信私有 API，也不注入任何 Cookie/Token：
+
+- 正文抓取：`identifyWechatArticleUrl` 只接受 `https://mp.weixin.qq.com/s/...` 直链；Chromium 打开文章页等待 `#js_content`（导航与正文各有 30 秒上限，超时不直接失败），Cheerio 多选择器降级解析标题、公众号、发布时间（`#publish_time`/`.time`/页面脚本 `var ct`）与正文，清洗版权节点、懒加载 `data-src` 并重建围栏代码块，经 node-html-markdown 输出 Markdown 和 HTTPS 媒体主机白名单内的图片 URL。
+- 文章发现：`searchArticles({query, source, limit})` 支持 `sogou`（先访问搜狗微信首页落 SNUID，再解析 `li[id^='sogou_vr_11002601_box']` 结果并在同一浏览器会话内逐条还原 `mp.weixin.qq.com` 直链，验证码命中即停、已还原条目保留）与 `mirror`（今天看啥专栏 URL 直接解析，或关键词经搜狗 `site:jintiankansha.me` 找专栏后纯 HTTP 解析 `/t/` 页还原直链）两个来源。条目间默认 3000ms 节流，可用 `WECHAT_SEARCH_INTERVAL_MS` 调整。
+
+集成点：`identifyPlatformContentUrl` 扩展 `wechat` 平台后，`/api/platform-content`、`/api/fetch-content` 自动匹配和 MCP `fetchWebContent`/`fetchPlatformContent` 对微信链接自动分流；MCP 新增 `searchWechatArticles`（Search scope，支持 `limit` 与 `source`）与 `fetchWechatArticle`（Fetch scope，host 限 `mp.weixin.qq.com`）；门户新增 `POST /api/wechat/discover`。浏览器路由只放行微信系静态资源主机，输出直链 host 全等校验；发现与抓取结果不落库、不进缓存，行为边界与错误码见 `docs/Requirements/REQ-20261010-001-wechat-content-fetch.md`。搜狗/镜像/微信页面均为第三方，页面改版或验证码会以 `SOGOU_CAPTCHA`、`WECHAT_SEARCH_UNAVAILABLE`、`WECHAT_ARTICLE_UNAVAILABLE` 等错误码返回；真实网络与设备验证待执行。
+
+### 微信公众号统一搜索源（2026-10-10 追加）
+
+`wechat` 作为第 14 个引擎进入统一搜索体系：`WechatProvider` 复用 `WechatContentService.searchArticles` 的搜狗链路，`maxResults` 10，结果只保留已还原直链的条目，`description` 携带公众号与发布日期；还原中途触发验证码时已解析结果作为 partial 返回（`failures` 携带 `SOGOU_CAPTCHA`），全部被拦截时整体抛错。引擎默认停用（`defaultEnabled: false`），无凭据要求；启用后首页搜索、MCP `search` 引擎枚举和引擎管理页按现有体系自动纳入。每次请求会启动浏览器会话并逐条 3 秒节流还原直链，整体耗时明显高于 HTTP 搜索源，可用 `WECHAT_SEARCH_INTERVAL_MS` 调整节流。

@@ -73,7 +73,7 @@ export function buildServer(config: ServerConfig, upstream: OpenWebSearchClient,
           },
         };
       }
-      const server = createMcpServer({ search: store.search, settings: store.settings, authorization: mcpAuthorization, getEnabledEngines: () => {
+      const server = createMcpServer({ search: store.search, settings: store.settings, authorization: mcpAuthorization, audit: store.audit, getEnabledEngines: () => {
         const available = store.database.orm.select({ id: engines.id }).from(engines).where(eq(engines.enabled, true)).all().map((engine) => engine.id as EngineId);
         return orderEngineIds(store.settings.get<unknown>("search.mcpEngineOrder"), available);
       } });

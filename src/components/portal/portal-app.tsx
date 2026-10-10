@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui/icon";
 import { PortalProvider, usePortal } from "@/components/portal/portal-context";
 import { PortalShell } from "@/components/portal/portal-shell";
 import { SearchPage } from "@/components/portal/pages/search-page";
+import { ContentPage } from "@/components/portal/pages/content-page";
 import { McpPage } from "@/components/portal/pages/mcp-page";
 import { EnginesPage } from "@/components/portal/pages/engines-page";
 import { UsagePage } from "@/components/portal/pages/usage-page";
@@ -129,7 +130,7 @@ function PortalWorkspace({ loginOnly = false }: { loginOnly?: boolean }) {
   }} />;
   if (checking) return <main className="grid min-h-screen place-items-center text-sm font-bold text-slate-500">{locale === "zh" ? "喵喵搜索" : "Miaomiao Search"}</main>;
   if (!loggedIn) return <LoginScreen onLogin={async (user) => { setUser(user); await refresh(); setLoggedIn(true); }} />;
-  const pages = { search: <SearchPage />, mcp: <McpPage />, engines: <EnginesPage />, usage: <UsagePage />, settings: <SettingsPage /> };
+  const pages = { search: <SearchPage />, content: <ContentPage />, mcp: <McpPage />, engines: <EnginesPage />, usage: <UsagePage />, settings: <SettingsPage /> };
   return <><PortalShell active={active} onNavigate={setActive} locale={locale} onLogout={() => void logout()}>{pages[active]}</PortalShell>{toast ? <Toast {...toast} /> : null}</>;
 }
 

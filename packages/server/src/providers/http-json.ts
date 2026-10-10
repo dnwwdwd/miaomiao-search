@@ -1,6 +1,7 @@
 import { DomainError } from "../domain.js";
 
 const defaultMaxBytes = 2_000_000;
+const hardMaxBytes = 5_000_000;
 const maxTimeoutMs = 60_000;
 
 export type HttpFetchOptions<T> = {
@@ -37,7 +38,7 @@ export async function fetchText(url: string, init: RequestInit = {}, options: { 
 
 async function fetchBounded(url: string, init: RequestInit, timeoutMs: number, maxBytes: number, fetchImpl: typeof fetch = fetch): Promise<{ status: number; headers: Headers; text: string; ok: boolean }> {
   const boundedTimeoutMs = Number.isFinite(timeoutMs) ? Math.max(1, Math.min(Math.floor(timeoutMs), maxTimeoutMs)) : maxTimeoutMs;
-  const boundedMaxBytes = Number.isFinite(maxBytes) ? Math.max(1, Math.min(Math.floor(maxBytes), defaultMaxBytes)) : defaultMaxBytes;
+  const boundedMaxBytes = Number.isFinite(maxBytes) ? Math.max(1, Math.min(Math.floor(maxBytes), hardMaxBytes)) : defaultMaxBytes;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), boundedTimeoutMs);
   try {

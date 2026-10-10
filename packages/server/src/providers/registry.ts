@@ -4,12 +4,15 @@ import type { OpenWebSearchClient } from "../upstream/open-websearch.js";
 import type { SettingsService } from "../services/settings.js";
 import { BilibiliProvider } from "./bilibili-provider.js";
 import { ExaProvider } from "./exa-provider.js";
+import { FeishuProvider } from "./feishu-provider.js";
 import { FirecrawlProvider } from "./firecrawl-provider.js";
 import { GithubProvider, type GithubClientFactory } from "./github-provider.js";
 import { OpenWebSearchProvider } from "./open-websearch-provider.js";
 import { TavilyProvider } from "./tavily-provider.js";
-import { ZhihuProvider } from "./zhihu-provider.js";
+import { ZhihuOfficialProvider } from "./zhihu-official-provider.js";
+import { WechatProvider } from "./wechat-provider.js";
 import type { SearchProvider } from "./types.js";
+import { FeishuConnectionService } from "../services/feishu-connection.js";
 
 export class SearchProviderRegistry {
   constructor(private readonly providers: Map<EngineId, SearchProvider>) {}
@@ -31,7 +34,9 @@ export function createProviderRegistry(settings: SettingsService, upstream: Open
     else if (kind === "tavily") providers.set(id, new TavilyProvider(settings));
     else if (kind === "github") providers.set(id, new GithubProvider(settings, options.githubClientFactory));
     else if (kind === "bilibili") providers.set(id, new BilibiliProvider());
-    else if (kind === "zhihu") providers.set(id, new ZhihuProvider(upstream));
+    else if (kind === "zhihu-official") providers.set(id, new ZhihuOfficialProvider(settings));
+    else if (kind === "feishu") providers.set(id, new FeishuProvider(new FeishuConnectionService(settings, options.fetch)));
+    else if (kind === "wechat") providers.set(id, new WechatProvider());
   }
   return new SearchProviderRegistry(providers);
 }

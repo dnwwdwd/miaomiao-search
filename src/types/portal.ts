@@ -2,7 +2,9 @@ export type Locale = "zh" | "en";
 export type LoginMethod = "oidc" | "local";
 export type PortalUser = { id: string; account: string; name: string; role: "ADMIN" | "NORMAL"; loginMethod: LoginMethod };
 export type ServiceStatus = "checking" | "online" | "offline";
-export type PortalTab = "search" | "mcp" | "engines" | "usage" | "settings";
+export type PortalTab = "search" | "content" | "mcp" | "engines" | "usage" | "settings";
+export type PlatformContent = { platform: "xiaohongshu" | "feishu"; sourceUrl: string; title: string; author?: string; publishedAt?: string; markdown: string; images: string[]; videoUrls: string[]; truncated: boolean; retrievalMethod: "official-api" | "public-page" };
+export type FeishuConnection = { configured: boolean; appId: string; connected: boolean; pending: boolean };
 export type EngineHealth = "Healthy" | "Degraded" | "Rate Limited" | "Blocked" | "Unavailable" | "Disabled" | "Unknown";
 export type TokenStatus = "Active" | "Disabled" | "Revoked";
 export type SearchScenario = "success" | "empty" | "partial" | "timeout" | "rate_limited" | "proxy" | "runtime" | "failed";
@@ -31,7 +33,7 @@ export type SearchEngine = {
   maxResults: number;
 };
 
-export type SearchResult = { id: string; title: string; url: string; description: string; faviconUrl?: string; thumbnailUrl?: string; videoMeta?: { author?: string; duration?: string; views?: number; likes?: number; favorites?: number; comments?: number; publishedAt?: number }; engines: string[] };
+export type SearchResult = { id: string; title: string; url: string; description: string; faviconUrl?: string; thumbnailUrl?: string; videoMeta?: { author?: string; duration?: string; views?: number; likes?: number; favorites?: number; comments?: number; publishedAt?: number }; zhihuMeta?: { contentType?: string; author?: string; voteUpCount?: number; commentCount?: number; editedAt?: number }; engines: string[] };
 export type SearchFailure = { engine: string; code: string; message: string };
 export type SearchEngineResultGroup = { engine: string; limit: number; results: SearchResult[]; cached: boolean; failure?: SearchFailure };
 export type SearchHistory = { id: string; query: string; engines: string[]; count: number; results: SearchResult[]; engineResults: SearchEngineResultGroup[]; failures: SearchFailure[]; createdAt: string };

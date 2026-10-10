@@ -29,12 +29,14 @@ const defaultSettings: Record<string, unknown> = {
   "history.retentionDays": 30,
   "log.saveQuery": false,
   "mcp.legacySse": false,
-  "mcp.tools": { search: true, fetchWebContent: true, fetchCsdnArticle: true, fetchJuejinArticle: true, fetchGithubReadme: true, fetchLinuxDoArticle: false },
+  "mcp.tools": { search: true, searchWechatArticles: true, fetchWebContent: true, fetchPlatformContent: true, fetchWechatArticle: true, fetchCsdnArticle: true, fetchJuejinArticle: true, fetchGithubReadme: true, fetchLinuxDoArticle: false },
 };
 
 export async function bootstrapDatabase(database: AppDatabase, config: ServerConfig): Promise<void> {
   void config;
   const now = new Date().toISOString();
+  database.sqlite.prepare("DELETE FROM engine WHERE id = 'zhihu'").run();
+  database.sqlite.prepare("DELETE FROM setting WHERE key = 'engine.zhihu.apiKey'").run();
   for (const id of engineIds) {
     const existing = database.orm.select({ id: engines.id }).from(engines).where(eq(engines.id, id)).get();
     if (!existing) {

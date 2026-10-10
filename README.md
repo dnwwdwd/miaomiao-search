@@ -6,8 +6,8 @@
 
 ## 功能
 
-- 聚合 12 个搜索源：Bing、Baidu、DuckDuckGo、Exa、CSDN、Juejin、Sogou、Firecrawl、Tavily、GitHub、B站和知乎，并记录部分失败信息。
-- Firecrawl/Tavily 使用用户加密 API Key；GitHub 支持可选 Token 的公共仓库搜索；B站通过公开接口搜索视频并返回经校验的官方 CDN 封面 URL；知乎通过 `site:zhuanlan.zhihu.com` 使用 Bing/Baidu 做实验性站内搜索，正文复用通用网页抓取。新增源首次启用时默认关闭，知乎不需要 Token。
+- 聚合 13 个搜索源：Bing、Baidu、DuckDuckGo、Exa、CSDN、Juejin、Sogou、Firecrawl、Tavily、GitHub、B站、知乎官方 CLI 和飞书，并记录部分失败信息。
+- Firecrawl/Tavily 使用用户加密 API Key；GitHub 支持可选 Token 的公共仓库搜索；B站通过公开接口搜索视频并返回经校验的官方 CDN 封面 URL；知乎官方 CLI 使用当前用户的 Access Secret 搜索，最多返回 10 条；飞书通过用户 OAuth 搜索当前账号有权访问的文档。小红书帖子和飞书文档可在独立抓取页按链接预览并下载 Markdown。新增源首次启用时默认关闭。
 - 读取网页正文；正文目标允许应用运行环境可达的任意 HTTP(S) 地址，保留 URL 格式、无凭据、超时、响应体大小和正文长度限制。
 - 管理搜索引擎、缓存、限流、历史记录和审计日志。
 - 通过 Streamable HTTP 暴露 MCP Tools；外部客户端使用 Access Token，懒猫小龙猫、Codex 等应用间 Agent 可通过 Resource MCP 委托访问。
@@ -46,7 +46,9 @@ export OIDC_USERINFO_URI='https://oidc.example.com/userinfo'
 export OPEN_WEBSEARCH_URL=http://127.0.0.1:3210
 ```
 
-Exa、Firecrawl、Tavily 和 GitHub 的凭据在门户“引擎管理”中按用户保存，服务端只在当前用户数据库中保存加密值；Exa MCP/Web 请求直接读取该设置，不依赖 `EXA_API_KEY` 环境变量。B站不需要 Key，也不读取登录态。B站公开接口可能触发 412，服务端只做一次匿名首页 Cookie 预热和一次重试，不保存 Cookie。不要把这些凭据写入仓库或提交到 `.env`。
+Exa、Firecrawl、Tavily、GitHub 和知乎官方 CLI 的凭据在门户“引擎管理”中按用户保存，服务端只在当前用户数据库中保存加密值；Exa MCP/Web 请求直接读取该设置，不依赖 `EXA_API_KEY` 环境变量。B站不需要 Key，也不读取登录态。B站公开接口可能触发 412，服务端只做一次匿名首页 Cookie 预热和一次重试，不保存 Cookie。不要把这些凭据写入仓库或提交到 `.env`。
+
+“知乎官方 CLI”引擎使用[知乎开放平台官方命令行工具](https://developer.zhihu.com/docs?key=zhihu_cli)执行站内搜索。Docker 镜像构建时校验并安装官方 0.6.0 二进制；本地开发需自行安装官方 CLI，或用 `ZHIHU_CLI_PATH` 指向其绝对路径。每位用户在引擎管理填写自己的 Access Secret 后才能启用该引擎。
 
 在另一个终端启动服务端：
 
@@ -120,3 +122,11 @@ lzc-cli lpk lint release/miaomiao-search-0.1.3.lpk
 ## 许可
 
 Apache-2.0。详见 [LICENSE](LICENSE)。
+
+## 平台内容抓取
+
+“内容抓取”页接收小红书帖子链接及分享短链、飞书 wiki/docx/docs 链接。输入框下方显示“小红书”“飞书”来源标签。页面按链接识别平台，预览内容并生成 Markdown 下载；懒猫环境通过文件选择器注入接管 Blob 下载。
+
+飞书公开分享页可直接抓取；连接飞书自建应用并完成设备 OAuth 后，可通过官方搜索接口查找当前授权账号有权访问的文档，并用 Docx API 读取正文与文档块。飞书 App Secret 和令牌按当前门户用户加密保存。知乎官方 CLI 需要 Access Secret；真实账号授权、目标网络及懒猫设备下载需要在部署环境验证。
+
+MCP 的 `fetchPlatformContent(url, maxChars?)` 可按链接自动抓取小红书帖子和飞书文档，返回平台标识、Markdown 正文和媒体链接。已有 `fetchWebContent` 对这两类链接自动分流，普通网页维持通用正文抓取；两个 Tool 都要求 Fetch 权限。

@@ -16,7 +16,7 @@ export function EngineIcon({ engine, className }: { engine: string; className?: 
   );
 }
 
-export function EngineTag({ engine, className, compact = false }: { engine: string; className?: string; compact?: boolean }) {
+export function EngineTag({ engine, className, compact = false, label }: { engine: string; className?: string; compact?: boolean; label?: string }) {
   const meta = getEngineMeta(engine);
-  return <span className={cn("engine-tag inline-flex items-center gap-1.5 rounded-full border font-bold", compact ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-[11px]", meta.tagClass, className)}><EngineIcon engine={engine} /><span>{meta.name}</span></span>;
+  return <span className={cn("engine-tag inline-flex items-center gap-1.5 rounded-full border font-bold", compact ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-[11px]", meta.tagClass, className)}><EngineIcon engine={engine} /><span>{label ?? meta.name}</span></span>;
 }

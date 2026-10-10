@@ -1,4 +1,4 @@
-export const engineIds = ["bing", "baidu", "duckduckgo", "exa", "csdn", "juejin", "sogou", "firecrawl", "tavily", "github", "bilibili", "zhihu"] as const;
+export const engineIds = ["bing", "baidu", "duckduckgo", "exa", "csdn", "juejin", "sogou", "firecrawl", "tavily", "github", "bilibili", "zhihu_official", "feishu", "wechat"] as const;
 export type EngineId = (typeof engineIds)[number];
 
 /**
@@ -39,6 +39,13 @@ export type SearchResult = {
     comments?: number;
     publishedAt?: number;
   };
+  zhihuMeta?: {
+    contentType?: string;
+    author?: string;
+    voteUpCount?: number;
+    commentCount?: number;
+    editedAt?: number;
+  };
   engines: EngineId[];
 };
 
@@ -69,6 +76,12 @@ export type FetchContent = {
   retrievalMethod?: string;
   extractionMethod?: string;
   readabilityApplied?: boolean;
+  platform?: "xiaohongshu" | "feishu" | "wechat";
+  source?: "csdn" | "juejin" | "linuxdo" | "github";
+  author?: string;
+  publishedAt?: string;
+  images?: string[];
+  videoUrls?: string[];
 };
 
 export function assertHttpUrlWithoutCredentials(value: string, label = "URL"): URL {

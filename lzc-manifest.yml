@@ -1,6 +1,21 @@
 application:
   subdomain: miaomiao-search
   oidc_redirect_path: /api/auth/oidc/callback
+  injects:
+    - id: lazycat-file-chooser
+      on: browser
+      when: ["/*"]
+      do:
+        - src: file:///lzcapp/pkg/content/lzc/lazycat-injects/lzc-file-chooser-inject.js
+          params:
+            diskRoot: /_lzc/files/home
+            fallbackMime: application/octet-stream
+            locale: auto
+            hooks:
+              fileSystemAccess: true
+              fileInput: true
+              download: true
+              objectUrl: true
   public_path:
     - /mcp
     - /
@@ -19,7 +34,7 @@ application:
 
 services:
   web:
-    image: registry.lazycat.cloud/u30387910/c1own123/lazycat:e7c7298f4c759b30
+    image: registry.lazycat.cloud/u30387910/c1own123/lazycat:c37f8d6655fee51e
     command: sh /opt/miaomiao-search/lzc/run-web.sh
     environment:
       - NODE_ENV=production
@@ -35,7 +50,7 @@ services:
       retries: 3
       start_period: 30s
   api:
-    image: registry.lazycat.cloud/u30387910/c1own123/lazycat:e7c7298f4c759b30
+    image: registry.lazycat.cloud/u30387910/c1own123/lazycat:c37f8d6655fee51e
     command: sh /opt/miaomiao-search/lzc/run-api.sh
     user: "0"
     binds:

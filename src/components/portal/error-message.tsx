@@ -21,6 +21,7 @@ const codeText: Record<string, { zh: string; en: string }> = {
   ENGINE_RATE_LIMIT: { zh: "搜索引擎触发了频率限制", en: "The search engine rate limit was reached" },
   TIMEOUT: { zh: "搜索请求超时", en: "The search request timed out" },
   FETCH_FAILED: { zh: "网页正文读取失败", en: "The page content could not be read" },
+  SOURCE_ACCESS_DENIED: { zh: "源站拒绝了当前网络的抓取请求", en: "The source site blocked requests from this network" },
   INTERNAL_ERROR: { zh: "服务暂时不可用", en: "The service is temporarily unavailable" },
   FIRECRAWL_AUTH_FAILED: { zh: "Firecrawl API Key 无效或无权限", en: "The Firecrawl API Key is invalid or unauthorized" },
   FIRECRAWL_QUOTA_EXHAUSTED: { zh: "Firecrawl 额度已用尽", en: "The Firecrawl quota has been exhausted" },
@@ -34,7 +35,29 @@ const codeText: Record<string, { zh: string; en: string }> = {
   BILIBILI_BLOCKED: { zh: "B站公开搜索接口暂时阻断", en: "Bilibili public search is temporarily blocked" },
   BILIBILI_RATE_LIMITED: { zh: "B站请求触发限流", en: "Bilibili rate limit reached" },
   BILIBILI_API_ERROR: { zh: "B站搜索接口返回错误", en: "Bilibili search returned an API error" },
-  ZHIHU_SEARCH_UNAVAILABLE: { zh: "知乎搜索暂时不可用", en: "Zhihu search is temporarily unavailable" },
+  ZHIHU_RATE_LIMITED: { zh: "知乎搜索次数或请求频率已达上限，请稍后再试", en: "Zhihu search limit reached; try again later" },
+  ZHIHU_CLI_UNAVAILABLE: { zh: "知乎官方 CLI 尚未安装", en: "The official Zhihu CLI is not installed" },
+  ZHIHU_CLI_FAILED: { zh: "知乎官方 CLI 搜索失败", en: "Official Zhihu CLI search failed" },
+  ZHIHU_AUTH_FAILED: { zh: "知乎 Access Secret 无效或无权限", en: "The Zhihu Access Secret is invalid or unauthorized" },
+  ZHIHU_QUOTA_EXHAUSTED: { zh: "知乎官方接口额度已用尽", en: "The official Zhihu API quota has been exhausted" },
+  XHS_TOKEN_REQUIRED: { zh: "请使用包含 xsec_token 的小红书分享链接", en: "Use a Xiaohongshu share link with xsec_token" },
+  XHS_CONTENT_NOT_FOUND: { zh: "小红书页面没有返回帖子内容", en: "The Xiaohongshu page did not return the note" },
+  XHS_SHARE_INVALID: { zh: "小红书分享链接无法解析", en: "The Xiaohongshu share link could not be resolved" },
+  XHS_PAGE_UNAVAILABLE: { zh: "小红书帖子暂时无法读取", en: "The Xiaohongshu note is temporarily unavailable" },
+  FEISHU_OAUTH_REQUIRED: { zh: "请先连接飞书账号", en: "Connect your Feishu account first" },
+  FEISHU_OAUTH_EXPIRED: { zh: "飞书授权已失效，请重新连接", en: "Feishu authorization expired. Reconnect your account" },
+  FEISHU_PERMISSION_DENIED: { zh: "当前飞书账号无权读取该文档", en: "Your Feishu account cannot read this document" },
+  FEISHU_CONTENT_NOT_FOUND: { zh: "飞书文档没有返回可读正文", en: "The Feishu document did not return readable content" },
+  FEISHU_BROWSER_UNAVAILABLE: { zh: "飞书公开文档读取器不可用", en: "The Feishu public document reader is unavailable" },
+  FEISHU_OAUTH_FAILED: { zh: "飞书授权失败，请检查应用配置", en: "Feishu authorization failed. Check your app settings" },
+  FEISHU_OAUTH_DENIED: { zh: "飞书授权未完成", en: "Feishu authorization was not completed" },
+  FEISHU_APP_INVALID: { zh: "飞书应用凭据格式无效", en: "The Feishu app credentials are invalid" },
+  FEISHU_APP_REQUIRED: { zh: "请先配置飞书应用", en: "Configure your Feishu app first" },
+  FEISHU_API_FAILED: { zh: "飞书文档接口请求失败", en: "The Feishu document request failed" },
+  FEISHU_SHARE_REDIRECTED: { zh: "飞书分享链接跳转到了非文档页面", en: "The Feishu share link redirected away from the document" },
+  FEISHU_SHARE_UNAVAILABLE: { zh: "飞书分享页面暂时无法读取", en: "The Feishu share page is temporarily unavailable" },
+  FEISHU_READ_FAILED: { zh: "飞书官方接口和分享页都未能读取正文", en: "Neither the Feishu API nor the share page returned readable content" },
+  PLATFORM_URL_UNSUPPORTED: { zh: "暂不支持该平台或链接", en: "This platform or link is not supported" },
   ENGINE_API_KEY_REQUIRED: { zh: "启用此搜索源前需要配置 API Key", en: "Configure an API Key before enabling this source" },
   ENGINE_API_KEY_UNSUPPORTED: { zh: "此搜索源不支持 API Key", en: "This search source does not support an API Key" },
   ENGINE_RESULT_LIMIT_EXCEEDED: { zh: "返回数量超过此搜索源上限", en: "The requested result limit exceeds this source's maximum" },
@@ -54,6 +77,7 @@ function normalizedCode(code?: string, message?: string): string {
   const value = (code ?? "").toUpperCase();
   if (value.includes("CONTENT_NOT_EXTRACTED") || /no readable content/i.test(message ?? "")) return "CONTENT_NOT_EXTRACTED";
   if (value.includes("TIMEOUT") || /timed out|超时/i.test(message ?? "")) return "TIMEOUT";
+  if (/request failed with status code 403|\bHTTP\s*403\b/i.test(message ?? "")) return "SOURCE_ACCESS_DENIED";
   // Upstream adapters often preserve the generic UPSTREAM_UNAVAILABLE code
   // while exposing the useful HTTP/URL detail only in the message.
   // The daemon may call this `engine_error`, so classify the useful detail

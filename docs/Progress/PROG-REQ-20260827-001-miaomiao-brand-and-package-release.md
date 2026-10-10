@@ -23,3 +23,21 @@
 - [x] 2026-09-13 重新打包 `0.1.3`：镜像 `docker.io/c1own123/lazycat:miaomiao-search-0.1.3-amd64`（digest `sha256:ff756f8d962c2e476a697a11f824d1fc65523a5e8020aaae39e7281473efa2a3`）已推送 Docker Hub。
 - [x] 复制到懒猫官方 registry `registry.lazycat.cloud/u30387910/c1own123/lazycat:e7c7298f4c759b30`，并更新 `lzc-manifest.yml`。
 - [x] 构建并校验 `release/miaomiao-search-0.1.3.lpk`（152,064 bytes，SHA-256 `00d658a12e4d312df2684a2be2f89813c2a2702dfbc82a715094a1efbd84c9c2`）；项目与 LPK lint 均通过。
+
+## 2026-09-26 重新打包
+
+- [x] 构建并推送 `docker.io/c1own123/lazycat:miaomiao-search-0.1.3-amd64`（digest `sha256:7519499f4d0973f539823accaec363cb243f4cbd87c3b9903b499ad19dc69741`）。
+- [x] 复制到懒猫官方 registry `registry.lazycat.cloud/u30387910/c1own123/lazycat:0da1d1c5dbddc16c`，并更新 `lzc-manifest.yml`。
+- [x] 重新生成 `release/miaomiao-search-0.1.3.lpk`（1,214,976 bytes，SHA-256 `dc3fad589738dd542975e808e516e38272d223e617415097ecaea9a04e32e5e2`）；`lzc-cli project lint` 与 `lzc-cli lpk lint` 均通过。
+
+## 2026-09-28 重新打包
+
+- [x] 构建并推送 `docker.io/c1own123/lazycat:miaomiao-search-0.1.3-amd64`（digest `sha256:16fb5bbd551c525c176ea483ccf87719a670c724e167f33dc7912d9f71588fdd`）。
+- [x] 复制到懒猫官方 registry `registry.lazycat.cloud/u30387910/c1own123/lazycat:0338ebb0dd589a1d`，并更新 `lzc-manifest.yml`。
+- [x] 重新生成 `release/miaomiao-search-0.1.3.lpk`（1,214,976 bytes，SHA-256 `a4d958794a439c31b0d5c2e666b2142375b166f3cdf445c93465fbf349905b5a`）；`lzc-cli project lint` 与 `lzc-cli lpk lint` 均通过。
+
+## 2026-09-28 再次重新打包
+
+- [x] 基于当前源码构建并推送 `docker.io/c1own123/lazycat:miaomiao-search-0.1.3-amd64`（digest `sha256:e3ba9dedc550b1558c0db76088a346f56da1afd55db41c539119f989c250cf4b`）。
+- [x] 复制到懒猫官方 registry `registry.lazycat.cloud/u30387910/c1own123/lazycat:0405d931400c998c`，并更新 `lzc-manifest.yml`。
+- [x] `lzc-cli project lint` 与 `lzc-cli lpk lint` 均通过；重新生成 `release/miaomiao-search-0.1.3.lpk`（1,214,976 bytes，SHA-256 `3ba4023e333f051a5231f082a7de37b13e6a45e5e75fbbf8b579e5c000d7639a`）。

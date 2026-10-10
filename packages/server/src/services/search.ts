@@ -4,6 +4,7 @@ import { createOpenWebSearchRegistry, createProviderRegistry, SearchProviderRegi
 import { AuditService } from "./audit.js";
 import { TtlLruCache } from "./cache.js";
 import { SettingsService } from "./settings.js";
+import { identifyPlatformContentUrl, PlatformContentService, type PlatformContent } from "./platform-content.js";
 
 const searchCacheTtlMs = 60 * 60 * 1_000;
 const contentCacheTtlMs = 24 * 60 * 60 * 1_000;
@@ -11,6 +12,25 @@ const contentCacheTtlMs = 24 * 60 * 60 * 1_000;
 type EngineLimitResolver = (engines: EngineId[]) => Partial<Record<EngineId, number | null>>;
 type EngineResolver = (engines: EngineId[], channel?: Channel) => EngineId[];
 export type SiteFetchToolName = "fetchCsdnArticle" | "fetchJuejinArticle" | "fetchGithubReadme" | "fetchLinuxDoArticle";
+type MatchedSite = { tool: SiteFetchToolName; source: NonNullable<FetchContent["source"]>; fetchUrl: string };
+
+/** Match article URLs precisely before invoking a site-specific upstream fetcher. */
+export function matchSiteContentUrl(input: string): MatchedSite | null {
+  const url = assertHttpUrlWithoutCredentials(input);
+  if (url.protocol !== "https:" || url.port) return null;
+  if (url.hostname === "blog.csdn.net" && /^\/[^/]+\/article\/details\/\d+\/?$/.test(url.pathname)) return { tool: "fetchCsdnArticle", source: "csdn", fetchUrl: input };
+  if (url.hostname === "juejin.cn" && /^\/post\/\d+\/?$/.test(url.pathname)) return { tool: "fetchJuejinArticle", source: "juejin", fetchUrl: input };
+  if (url.hostname === "linux.do") {
+    const topicId = /^\/topic\/(\d+)\/?$/.exec(url.pathname)?.[1] ?? /^\/t\/topic\/(\d+)\.json$/.exec(url.pathname)?.[1] ?? /^\/t\/(?:[^/]+\/)?(\d+)(?:\/\d+)?\/?$/.exec(url.pathname)?.[1];
+    if (topicId) return { tool: "fetchLinuxDoArticle", source: "linuxdo", fetchUrl: `https://linux.do/t/topic/${topicId}.json` };
+  }
+  if (url.hostname === "github.com" || url.hostname === "www.github.com") {
+    const repo = /^\/([a-zA-Z0-9][a-zA-Z0-9-]*)\/([a-zA-Z0-9_.-]+)\/?$/.exec(url.pathname);
+    const reserved = new Set(["about", "collections", "enterprise", "events", "explore", "features", "issues", "login", "marketplace", "new", "notifications", "orgs", "pricing", "search", "settings", "signup", "sponsors", "topics", "trending", "users"]);
+    if (repo && !reserved.has(repo[1].toLowerCase())) return { tool: "fetchGithubReadme", source: "github", fetchUrl: input };
+  }
+  return null;
+}
 
 export class SearchService {
   constructor(
@@ -26,6 +46,7 @@ export class SearchService {
     // provider catalog. Callers without settings (for example isolated unit
     // tests) retain the legacy Open-WebSearch-only fallback.
     private readonly providers: SearchProviderRegistry = settings ? createProviderRegistry(settings, upstream) : createOpenWebSearchRegistry(upstream),
+    private readonly platformContent: Pick<PlatformContentService, "fetch"> | undefined = settings ? new PlatformContentService(settings) : undefined,
   ) {}
 
   async search(input: SearchInput, context: { channel: Channel; saveHistory?: boolean; tokenId?: string; tokenPrefix?: string; bypassCache?: boolean }): Promise<SearchResponse> {
@@ -119,10 +140,26 @@ export class SearchService {
     this.searchCache.clear();
   }
 
-  async fetchContent(url: string, maxChars: number, context: { channel: Channel; tokenId?: string; tokenPrefix?: string }): Promise<{ content: FetchContent; cached: boolean; requestId: string }> {
+  async fetchContent(url: string, maxChars: number, context: { channel: Channel; tokenId?: string; tokenPrefix?: string; autoMatch?: boolean }): Promise<{ content: FetchContent; cached: boolean; requestId: string }> {
     const configuredMaxChars = this.setting("fetch.maxChars", 50_000);
     this.assertMaxChars(maxChars, configuredMaxChars);
-    assertHttpUrlWithoutCredentials(url);
+    const target = assertHttpUrlWithoutCredentials(url);
+    if (!context.autoMatch && (target.hostname === "zhihu.com" || target.hostname.endsWith(".zhihu.com"))) throw new DomainError("PLATFORM_URL_UNSUPPORTED", "暂不支持该平台或链接类型", 400);
+    if ((context.channel === "mcp" || context.autoMatch) && identifyPlatformContentUrl(url) && this.platformContent) {
+      const result = await this.fetchPlatformContent(url, maxChars, context);
+      const platform = result.content;
+      return { content: {
+        url, finalUrl: platform.sourceUrl, title: platform.title, contentType: "text/markdown",
+        truncated: platform.truncated, content: platform.markdown, retrievalMethod: platform.retrievalMethod,
+        platform: platform.platform, author: platform.author, publishedAt: platform.publishedAt,
+        images: platform.images, videoUrls: platform.videoUrls,
+      }, cached: false, requestId: result.requestId };
+    }
+    const site = context.autoMatch ? matchSiteContentUrl(url) : null;
+    if (site) {
+      const result = await this.fetchSiteContent(site.tool, site.fetchUrl, maxChars, context);
+      return { ...result, content: { ...result.content, url, source: site.source } };
+    }
     const startedAt = Date.now();
     // Bump the strategy version whenever extraction fallbacks change so stale
     // single-strategy bodies cannot mask a newly readable page.
@@ -142,6 +179,22 @@ export class SearchService {
     } catch (error) {
       const domainError = error instanceof DomainError ? error : new DomainError("FETCH_FAILED", "正文读取失败", 502);
       this.audit.record({ channel: context.channel, operation: "fetchWebContent", tokenId: context.tokenId, tokenPrefix: context.tokenPrefix, latencyMs: Date.now() - startedAt, cacheHit: cached, status: "error", errorCode: domainError.code });
+      throw domainError;
+    }
+  }
+
+  async fetchPlatformContent(url: string, maxChars: number, context: { channel: Channel; tokenId?: string; tokenPrefix?: string }): Promise<{ content: PlatformContent; cached: false; requestId: string }> {
+    this.assertMaxChars(maxChars, this.setting("fetch.maxChars", 50_000));
+    assertHttpUrlWithoutCredentials(url);
+    if (!this.platformContent) throw new DomainError("PLATFORM_FETCH_UNAVAILABLE", "平台内容抓取器未配置", 503);
+    const startedAt = Date.now();
+    try {
+      const content = await this.platformContent.fetch(url, maxChars);
+      const requestId = this.audit.record({ channel: context.channel, operation: "fetchPlatformContent", tokenId: context.tokenId, tokenPrefix: context.tokenPrefix, latencyMs: Date.now() - startedAt, cacheHit: false, resultCount: 1, status: "success" });
+      return { content, cached: false, requestId };
+    } catch (error) {
+      const domainError = error instanceof DomainError ? error : new DomainError("FETCH_FAILED", "平台正文读取失败", 502);
+      this.audit.record({ channel: context.channel, operation: "fetchPlatformContent", tokenId: context.tokenId, tokenPrefix: context.tokenPrefix, latencyMs: Date.now() - startedAt, cacheHit: false, status: "error", errorCode: domainError.code });
       throw domainError;
     }
   }
@@ -236,6 +289,7 @@ function deduplicateResults(results: SearchResult[]): SearchResult[] {
       existing.engines = [...new Set([...existing.engines, ...result.engines])] as EngineId[];
       if (!existing.thumbnailUrl && result.thumbnailUrl) existing.thumbnailUrl = result.thumbnailUrl;
       if (!existing.videoMeta && result.videoMeta) existing.videoMeta = result.videoMeta;
+      if (!existing.zhihuMeta && result.zhihuMeta) existing.zhihuMeta = result.zhihuMeta;
     } else {
       merged.set(key, { ...result, url: key, engines: [...new Set(result.engines)] as EngineId[] });
     }

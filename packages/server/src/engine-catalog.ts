@@ -1,7 +1,7 @@
 import type { EngineId } from "./domain.js";
 
 export type CredentialMode = "none" | "optional" | "required";
-export type ProviderKind = "open-websearch" | "exa" | "firecrawl" | "tavily" | "github" | "bilibili" | "zhihu";
+export type ProviderKind = "open-websearch" | "exa" | "firecrawl" | "tavily" | "github" | "bilibili" | "zhihu-official" | "feishu" | "wechat";
 export type EngineDefinition = {
   provider: ProviderKind;
   requiresProxy: boolean;
@@ -26,7 +26,9 @@ export const engineCatalog: Record<EngineId, EngineDefinition> = {
   tavily: { provider: "tavily", requiresProxy: false, credentialMode: "required", credentialLabel: "Tavily API Key", credentialPlaceholder: "tvly-...", credentialUrl: "https://app.tavily.com/home", defaultEnabled: false, defaultSelected: false, maxResults: 20 },
   github: { provider: "github", requiresProxy: false, credentialMode: "optional", credentialLabel: "GitHub Personal Access Token", credentialPlaceholder: "github_pat_... / ghp_...", credentialUrl: "https://github.com/settings/tokens/new", defaultEnabled: false, defaultSelected: false, maxResults: 50 },
   bilibili: { provider: "bilibili", requiresProxy: false, credentialMode: "none", defaultEnabled: false, defaultSelected: false, maxResults: 20 },
-  zhihu: { provider: "zhihu", requiresProxy: false, credentialMode: "none", defaultEnabled: false, defaultSelected: false, maxResults: 20 },
+  zhihu_official: { provider: "zhihu-official", requiresProxy: false, credentialMode: "required", credentialLabel: "知乎开放平台 Access Secret", credentialPlaceholder: "Access Secret", credentialUrl: "https://developer.zhihu.com/profile", defaultEnabled: false, defaultSelected: false, maxResults: 10 },
+  feishu: { provider: "feishu", requiresProxy: false, credentialMode: "none", defaultEnabled: false, defaultSelected: false, maxResults: 20 },
+  wechat: { provider: "wechat", requiresProxy: false, credentialMode: "none", defaultEnabled: false, defaultSelected: false, maxResults: 10 },
 };
 
 export type CatalogEngineId = keyof typeof engineCatalog;

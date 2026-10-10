@@ -23,6 +23,8 @@ fi
 
 rm -rf "$DIST_ROOT"
 mkdir -p "$DIST_ROOT"
+mkdir -p "$DIST_ROOT/lzc"
+cp -R "$REPO_ROOT/lzc/lazycat-injects" "$DIST_ROOT/lzc/lazycat-injects"
 cat > "$DIST_ROOT/README.txt" <<'EOF'
 Miaomiao Search runtime files are delivered by the official Lazycat container image.
 Persistent data is stored under /lzcapp/var/miaomiao-search/data.

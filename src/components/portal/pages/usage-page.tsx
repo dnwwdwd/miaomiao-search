@@ -55,6 +55,7 @@ function seriesLabel(bucket: string, mode: "hour" | "day", locale: string) {
 function operationLabel(operation: string, english: boolean) {
   if (operation === "search") return english ? "Search" : "搜索";
   if (operation === "fetchWebContent") return english ? "Fetch web content" : "抓取网页正文";
+  if (operation === "fetchPlatformContent") return english ? "Fetch platform content" : "抓取平台内容";
   return operation;
 }
 

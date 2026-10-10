@@ -2,7 +2,10 @@
 
 | ID | 日期 | 标题 | 状态 | 关联需求 | 用户确认 | 记录位置 |
 |---|---|---|---|---|---|---|
-| DEC-20260913-001 | 2026-09-13 | 知乎搜索源采用站内查询与通用正文链路 | 已确认实施 | REQ-20260913-001 | 用户确认采用 `site:zhuanlan.zhihu.com`，知乎结果单独渲染，正文复用现有抓取链路，失败使用错误组件。 | `docs/Decisions/DEC-20260913-001-zhihu-search-source.md` |
+| DEC-20261010-001 | 2026-10-10 | 微信公众号抓取与文章发现整合方案 | 已实施，待真实验证 | REQ-20261010-001 | 用户确认 Playwright 抓取、搜狗 + 镜像 + 直链发现、MCP 搜索与抓取 Tool、不归档实时返回 | `docs/Decisions/DEC-20261010-001-wechat-content-fetch.md` |
+| DEC-20260928-001 | 2026-09-28 | 内容抓取按链接匹配现有抓取器 | 已实施，补充改动待回归 | REQ-20260928-001 | 用户要求自动匹配现有来源、未支持链接回退网页抓取，来源标签统一首页色板 | `docs/Decisions/DEC-20260928-001-content-auto-fetch.md` |
+| DEC-20260925-001 | 2026-09-25 | 小红书与飞书抓取、飞书及知乎官方搜索方案 | 已实施 | REQ-20260925-001 | 飞书 OAuth 搜索、分享页回退、Markdown 下载、知乎官方 CLI 搜索和 MCP 小红书/飞书按链接自动抓取已实施；待目标环境验证 | `docs/Decisions/DEC-20260925-001-platform-content-fetch.md` |
+| DEC-20260913-001 | 2026-09-13 | 知乎搜索源采用站内查询与通用正文链路 | 已由官方 CLI 搜索替代 | REQ-20260913-001 | 用户确认采用 `site:zhuanlan.zhihu.com`，知乎结果单独渲染，正文复用现有抓取链路，失败使用错误组件。 | `docs/Decisions/DEC-20260913-001-zhihu-search-source.md` |
 | DEC-20260831-003 | 2026-08-31 | Exa 凭据从用户数据库读取 | 已确认实施 | REQ-20260831-003 | Exa Web/MCP 请求改为读取当前用户加密设置，不再依赖 daemon 环境变量；补充注入式 Provider/MCP 测试。 | `docs/Decisions/DEC-20260831-003-exa-database-credential.md` |
 | DEC-20260831-002 | 2026-08-31 | 门户浮层、凭据入口与 B 站详情展示 | 已确认实施 | REQ-20260831-002 | 用户要求修复表格下拉遮挡、收口正文弹窗、为 B 站使用视频详情展示、补充凭据官网入口和首页来源交互提示。 | `docs/Decisions/DEC-20260831-002-portal-interaction-and-bilibili-details.md` |
 | DEC-20260831-001 | 2026-08-31 | 四类搜索源的 Provider、凭据与 B站封面方案 | 已确认实施 | REQ-20260831-001 | Firecrawl/Tavily REST、GitHub Octokit、B站公开 Web API；封面只返回官方 CDN URL；Registry 按用户创建；不重置旧设置。 | `docs/Decisions/DEC-20260831-001-four-search-providers.md` |

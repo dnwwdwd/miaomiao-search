@@ -8,6 +8,7 @@
 |---|---|---|
 | 项目协作契约 | `AGENTS.md` | 协作、验证或提交规则变化时更新。 |
 | 项目说明 | `README.md` | 项目简介、本地运行、验证与安全说明更新时同步。 |
+| 版本更新日志 | `CHANGELOG.md` | 每次版本功能收口或重新打包交付后更新。 |
 | 文档地图 | `DOCUMENT_MAP.md` | 新建、移动或替换事实文档时更新。 |
 | 产品需求与产品设计 | `docs/喵喵搜索 PRD.md` | 产品范围、页面、用户流程或验收变化时更新。 |
 | 技术规格 | `docs/Miaomiao Search 技术实现文档.md` | 架构、接口、数据、兼容性或部署方案变化时更新。 |
@@ -25,6 +26,10 @@
 | 功能进度记录 | `docs/Progress/PROG-*.md` | 大任务的计划、证据、风险、阻塞或完成结果变化时更新。 |
 
 ## 当前事实边界
+
+- 2026-10-10 微信公众号内容抓取与文章发现记录在 `docs/Requirements/REQ-20261010-001-wechat-content-fetch.md`、`docs/Decisions/DEC-20261010-001-wechat-content-fetch.md`、`docs/Progress/PROG-REQ-20261010-001-wechat-content-fetch.md`；本地实现与自动化测试已完成，真实网络与设备验证待执行。
+- 2026-09-28 内容抓取页自动匹配及状态文字颜色记录在 `docs/Requirements/REQ-20260928-001-content-auto-fetch.md`、`docs/Decisions/DEC-20260928-001-content-auto-fetch.md`、`docs/Progress/PROG-REQ-20260928-001-content-auto-fetch.md`。
+- 2026-09-25 小红书与飞书内容抓取及飞书、知乎官方搜索的调研、决策和进度分别记录在 `docs/Decisions/DEC-20260925-001-platform-content-fetch.md`、`docs/Requirements/REQ-20260925-001-platform-content-fetch.md`、`docs/Progress/PROG-REQ-20260925-001-platform-content-fetch.md`；本地实现已完成，真实账号和懒猫设备验证待执行。
 
 - 当前仓库包含产品需求、技术设计、静态交互原型、Next.js 门户与 `packages/server` Fastify 服务；已有 pnpm workspace、SQLite 迁移、服务端测试、ESLint、TypeScript、Dockerfile 和 LPK V2 构建配置。Docker Hub/懒猫官方镜像已发布，设备安装仍待外部验证。
 - `miaomiao_search_portal.html` 是历史静态交互原型；Next.js 门户已通过同源 `/api/*` 与 `/mcp` 路径接入本地 Fastify 服务，页面外观以该原型为参照。

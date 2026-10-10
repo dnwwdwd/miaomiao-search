@@ -152,6 +152,10 @@ input, select, textarea { font-size: 13px !important; }
 .engine-tag-github { background: #f1f5f9 !important; color: #0f172a !important; border-color: #cbd5e1 !important; }
 .engine-tag-bilibili { background: #fce7f3 !important; color: #be185d !important; border-color: #f9a8d4 !important; }
 .engine-tag-zhihu { background: #e0f2fe !important; color: #0369a1 !important; border-color: #bae6fd !important; }
+.engine-tag-feishu { background: #e8f1ff !important; color: #2258c6 !important; border-color: #b5d0ff !important; }
+.engine-tag-xiaohongshu { background: #fff1f2 !important; color: #be123c !important; border-color: #fecdd3 !important; }
+.engine-tag-linuxdo { background: #ecfeff !important; color: #0e7490 !important; border-color: #a5f3fc !important; }
+.engine-tag-wechat { background: #ecfdf5 !important; color: #15803d !important; border-color: #bbf7d0 !important; }
 .engine-tag-unknown { background: #f1f5f9 !important; color: #475569 !important; border-color: #cbd5e1 !important; }
 
 .white-card {
