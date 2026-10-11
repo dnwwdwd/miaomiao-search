@@ -6,6 +6,19 @@ type AxiosResponse = { status: number; headers: Record<string, unknown>; data: u
 type AxiosRequestStub = (options: AxiosOptions) => Promise<AxiosResponse>;
 const loadModule = (specifier: string) => import(specifier) as Promise<Record<string, unknown>>;
 
+// open-websearch caches a local Chromium session on first browser fallback.
+// The cached ChildProcess and its sockets keep the event loop alive, so the
+// test run never exits. Shut the cached sessions down after every test.
+async function shutdownBrowserSessions(): Promise<void> {
+  try {
+    const playwright = await loadModule("open-websearch/build/utils/playwrightClient.js");
+    const shutdown = playwright.shutdownLocalPlaywrightBrowserSessions as (() => Promise<void>) | undefined;
+    if (shutdown) await shutdown();
+  } catch { /* The module may not have been loaded by the test. */ }
+}
+
+test.afterEach(shutdownBrowserSessions);
+
 test("patched Bing follows the regional 302, keeps cookies, and bypasses the configured proxy", async () => {
   const [bingModule, httpModule] = await Promise.all([
     loadModule("open-websearch/build/engines/bing/index.js"),

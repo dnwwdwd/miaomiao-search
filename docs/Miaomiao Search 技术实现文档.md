@@ -995,7 +995,9 @@ MCP `search` Tool 名称与返回结构保持不变，工具描述和引擎枚�
 
 ### 门户内容抓取自动匹配（2026-09-28）
 
-内容页通过现有 `/api/fetch-content` 提交 `autoMatch: true`。`SearchService.fetchContent` 先识别小红书和飞书，再按精确 HTTPS 主机和内容路径匹配 CSDN、掘金、Linux.do、GitHub 仓库；其他链接调用通用 `fetchWebContent`。Linux.do 的 `/t/<slug>/<id>` 转为专用上游可用的 `/t/topic/<id>.json`，结果保留输入 URL。响应中的 `platform` 或 `source` 用于页面来源标签；平台媒体继续随响应返回。未传 `autoMatch` 的门户搜索页阅读器及 MCP 行为保持原有路径，`/api/platform-content` 仍可单独使用。专用抓取器返回的文本按当前结果生成 Markdown 文件，不补造媒体链接。
+内容页通过现有 `/api/fetch-content` 提交 `autoMatch: true`。`SearchService.fetchContent` 先识别小红书和飞书，再按精确 HTTPS 主机和内容路径匹配 CSDN、掘金、Linux.do、GitHub 仓库；其他链接调用通用 `fetchWebContent`。Linux.do 的 `/t/<slug>/<id>` 转为专用上游可用的 `/t/topic/<id>.json`，结果保留输入 URL。响应中的 `platform` 或 `source` 用于页面来源标签；平台媒体继续随响应返回。`/api/platform-content` 仍可单独使用。专用抓取器返回的文本按当前结果生成 Markdown 文件，不补造媒体链接。
+
+平台正文路由自 2026-10-11 起不再依赖 `autoMatch` 或渠道（详见 `docs/Decisions/DEC-20260928-001-content-auto-fetch.md`）：URL 命中 `identifyPlatformContentUrl`（小红书、微信公众号、编程导航、飞书）时无条件走平台专用/官方接口，`autoMatch` 仅继续控制 CSDN、掘金、Linux.do、GitHub README 等站点专用抓取器。编程导航等平台的官方接口直接返回 Markdown，避免抓取 HTML 页面丢失代码块、图片和文档结构。
 
 ### MCP 平台内容自动分流（2026-09-25）
 

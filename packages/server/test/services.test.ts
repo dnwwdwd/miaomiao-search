@@ -78,7 +78,7 @@ test("migration and bootstrap create default engines without a local administrat
   try {
     await bootstrapDatabase(database, config);
     await bootstrapDatabase(database, config);
-    assert.equal(count(database, "SELECT COUNT(*) AS count FROM engine"), 14);
+    assert.equal(count(database, "SELECT COUNT(*) AS count FROM engine"), 15);
     assert.equal(count(database, "SELECT COUNT(*) AS count FROM engine WHERE id = 'startpage'"), 0);
     assert.equal(count(database, "SELECT COUNT(*) AS count FROM setting"), 22);
     assert.equal(count(database, "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'local_account'"), 1);
@@ -113,7 +113,7 @@ test("bootstrap retires the legacy Zhihu engine and its saved credential", async
     await bootstrapDatabase(database, config);
     assert.equal(count(database, "SELECT COUNT(*) AS count FROM engine WHERE id = 'zhihu'"), 0);
     assert.equal(count(database, "SELECT COUNT(*) AS count FROM setting WHERE key = 'engine.zhihu.apiKey'"), 0);
-    assert.equal(count(database, "SELECT COUNT(*) AS count FROM engine"), 14);
+    assert.equal(count(database, "SELECT COUNT(*) AS count FROM engine"), 15);
   } finally {
     database.close();
     rmSync(dir, { recursive: true, force: true });
@@ -453,6 +453,49 @@ test("portal content fetch selects supported site readers and keeps other caller
   }
 });
 
+test("platform content routing does not depend on autoMatch or channel", async () => {
+  const { dir, config, database } = setup();
+  try {
+    const upstream = new FakeUpstream();
+    const requested: Array<{ url: string; maxChars?: number }> = [];
+    const platformFetch = { fetch: async (url: string, maxChars?: number) => {
+      requested.push({ url, maxChars });
+      return { platform: "codefather" as const, sourceUrl: url, title: "编程导航文章", markdown: "# 编程导航文章\n\n```java\nSystem.out.println(1);\n```", images: ["https://pic.example/cover.png"], videoUrls: [], truncated: false, retrievalMethod: "official-api" as const };
+    } };
+    const service = new SearchService(upstream, new AuditService(database), new SettingsService(database, config.settingsEncryptionKey), undefined, undefined, undefined, undefined, undefined, platformFetch);
+    const codefatherUrl = "https://www.codefather.cn/post/1904850755499778050";
+
+    // The portal search reader calls fetchContent without autoMatch; the
+    // platform reader must still win over generic HTML scraping.
+    const plain = await service.fetchContent(codefatherUrl, 50_000, { channel: "web" });
+    assert.equal(plain.content.platform, "codefather");
+    assert.equal(plain.content.retrievalMethod, "official-api");
+    assert.match(plain.content.content, /System\.out\.println/);
+    assert.deepEqual(plain.content.images, ["https://pic.example/cover.png"]);
+    assert.equal(upstream.fetchCalls.length, 0);
+
+    // Explicit autoMatch keeps working and does not double-fetch.
+    const matched = await service.fetchContent(codefatherUrl, 50_000, { channel: "web", autoMatch: true });
+    assert.equal(matched.content.platform, "codefather");
+    assert.equal(upstream.fetchCalls.length, 0);
+
+    // MCP channel still routes through the platform reader.
+    const mcp = await service.fetchContent(codefatherUrl, 50_000, { channel: "mcp" });
+    assert.equal(mcp.content.platform, "codefather");
+    assert.equal(upstream.fetchCalls.length, 0);
+    assert.deepEqual(requested.map((entry) => entry.maxChars), [50_000, 50_000, 50_000]);
+
+    // Unsupported hosts keep using the generic web fetcher.
+    const generic = await service.fetchContent("https://example.com/article", 50_000, { channel: "web" });
+    assert.equal(generic.content.platform, undefined);
+    assert.equal(upstream.fetchCalls.at(-1), "web:https://example.com/article");
+    assert.equal(requested.length, 3);
+  } finally {
+    database.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("upstream adapter rejects insecure runtime settings and unsafe result URLs", async () => {
   const originalFetch = globalThis.fetch;
   try {
@@ -531,6 +574,31 @@ test("usage statistics aggregate the selected range and include MCP filters and 
     assert.throws(() => audit.usage({ from: to, to: from }), (error: unknown) => error instanceof DomainError && error.code === "USAGE_RANGE_INVALID");
     assert.throws(() => audit.usage({ from: new Date(now - 366 * DAY_MS).toISOString(), to }), (error: unknown) => error instanceof DomainError && error.code === "USAGE_RANGE_TOO_LARGE");
   } finally {
+    database.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("usage statistics include records written in the current millisecond when to is omitted", async () => {
+  const { dir, config, database } = setup();
+  const realNow = Date.now;
+  try {
+    await bootstrapDatabase(database, config);
+    const audit = new AuditService(database);
+    const insert = database.sqlite.prepare("INSERT INTO request_log (id, channel, operation, token_prefix, engines, latency_ms, cache_hit, result_count, status, error_code, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    // Freeze the clock so both rows land in the exact millisecond the query
+    // resolves "now" to. With an exclusive `to = now` bound the rows would be
+    // dropped; the implicit bound must therefore include the current instant.
+    const frozen = realNow();
+    Date.now = () => frozen;
+    const createdAt = new Date(frozen).toISOString();
+    insert.run("same-ms-1", "web", "search", null, '["bing"]', 10, 0, 1, "success", null, createdAt);
+    insert.run("same-ms-2", "web", "search", null, '["bing"]', 10, 0, 1, "success", null, createdAt);
+    const result = audit.usage({ timeZone: "Asia/Shanghai", page: 1, pageSize: 20 });
+    assert.equal(result.summary.total, 2);
+    assert.equal(result.pagination.total, 2);
+  } finally {
+    Date.now = realNow;
     database.close();
     rmSync(dir, { recursive: true, force: true });
   }
@@ -698,7 +766,7 @@ test("management API authenticates a session and returns persisted portal data",
   const cookie = `miaomiao_search_session=${await auth.createSession({ id: "lazycat-user", account: "lazycat-user", name: "Lazycat User", role: "NORMAL", loginMethod: "oidc" })}`;
     const enginesResponse = await app.inject({ method: "GET", url: "/api/engines", headers: { host: "127.0.0.1", cookie: String(cookie).split(";")[0] } });
     assert.equal(enginesResponse.statusCode, 200);
-    assert.equal(enginesResponse.json().engines.length, 14);
+    assert.equal(enginesResponse.json().engines.length, 15);
     const enginePayload = enginesResponse.json().engines as Array<Record<string, unknown>>;
     assert.equal(enginePayload.find((engine) => engine.id === "tavily")?.maxResults, 20);
     assert.equal(enginePayload.find((engine) => engine.id === "github")?.apiKeyOptional, true);

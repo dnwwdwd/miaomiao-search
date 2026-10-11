@@ -159,7 +159,12 @@ type NormalizedUsageQuery = Required<Omit<UsageQueryInput, "operation" | "engine
 type SqlParam = string | number;
 
 function normalizeUsageQuery(input: UsageQueryInput): NormalizedUsageQuery {
-  const toDate = input.to ? new Date(input.to) : new Date();
+  // `to` is an exclusive upper bound. When callers omit it we use the current
+  // instant, but records written in that same millisecond would then fall
+  // outside `created_at < to` and silently disappear. Advance the implicit
+  // bound by one millisecond so "now" is inclusive; explicit ranges keep the
+  // exact caller-supplied value.
+  const toDate = input.to ? new Date(input.to) : new Date(Date.now() + 1);
   const fromDate = input.from ? new Date(input.from) : new Date(toDate.getTime() - 7 * 24 * 60 * 60 * 1_000);
   if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime()) || fromDate >= toDate) throw new DomainError("USAGE_RANGE_INVALID", "统计时间范围无效");
   if (toDate.getTime() - fromDate.getTime() > 365 * 24 * 60 * 60 * 1_000) throw new DomainError("USAGE_RANGE_TOO_LARGE", "统计时间范围不能超过 365 天");

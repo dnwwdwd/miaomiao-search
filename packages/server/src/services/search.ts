@@ -149,7 +149,11 @@ export class SearchService {
     this.assertMaxChars(maxChars, configuredMaxChars);
     const target = assertHttpUrlWithoutCredentials(url);
     if (!context.autoMatch && (target.hostname === "zhihu.com" || target.hostname.endsWith(".zhihu.com"))) throw new DomainError("PLATFORM_URL_UNSUPPORTED", "暂不支持该平台或链接类型", 400);
-    if ((context.channel === "mcp" || context.autoMatch) && identifyPlatformContentUrl(url) && this.platformContent) {
+    // Supported platforms always resolve through their official/specialized
+    // readers. Scraping the public HTML page loses code blocks, images and
+    // structure, so routing must not depend on the caller opting in via
+    // autoMatch (web portal readers never set it).
+    if (identifyPlatformContentUrl(url) && this.platformContent) {
       const result = await this.fetchPlatformContent(url, maxChars, context);
       const platform = result.content;
       return { content: {
