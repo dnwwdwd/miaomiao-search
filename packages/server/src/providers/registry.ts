@@ -11,6 +11,7 @@ import { OpenWebSearchProvider } from "./open-websearch-provider.js";
 import { TavilyProvider } from "./tavily-provider.js";
 import { ZhihuOfficialProvider } from "./zhihu-official-provider.js";
 import { WechatProvider } from "./wechat-provider.js";
+import { CodefatherProvider } from "./codefather-provider.js";
 import type { SearchProvider } from "./types.js";
 import { FeishuConnectionService } from "../services/feishu-connection.js";
 
@@ -37,6 +38,7 @@ export function createProviderRegistry(settings: SettingsService, upstream: Open
     else if (kind === "zhihu-official") providers.set(id, new ZhihuOfficialProvider(settings));
     else if (kind === "feishu") providers.set(id, new FeishuProvider(new FeishuConnectionService(settings, options.fetch)));
     else if (kind === "wechat") providers.set(id, new WechatProvider());
+    else if (kind === "codefather") providers.set(id, new CodefatherProvider(options.fetch));
   }
   return new SearchProviderRegistry(providers);
 }

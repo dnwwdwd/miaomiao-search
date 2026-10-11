@@ -5,19 +5,23 @@ import { AuditService } from "./audit.js";
 import { TtlLruCache } from "./cache.js";
 import { SettingsService } from "./settings.js";
 import { identifyPlatformContentUrl, PlatformContentService, type PlatformContent } from "./platform-content.js";
+import { CodefatherContentService } from "./codefather-content.js";
 
 const searchCacheTtlMs = 60 * 60 * 1_000;
 const contentCacheTtlMs = 24 * 60 * 60 * 1_000;
 
 type EngineLimitResolver = (engines: EngineId[]) => Partial<Record<EngineId, number | null>>;
 type EngineResolver = (engines: EngineId[], channel?: Channel) => EngineId[];
-export type SiteFetchToolName = "fetchCsdnArticle" | "fetchJuejinArticle" | "fetchGithubReadme" | "fetchLinuxDoArticle";
+export type SiteFetchToolName = "fetchCsdnArticle" | "fetchJuejinArticle" | "fetchGithubReadme" | "fetchLinuxDoArticle" | "fetchCodefatherArticle";
 type MatchedSite = { tool: SiteFetchToolName; source: NonNullable<FetchContent["source"]>; fetchUrl: string };
 
 /** Match article URLs precisely before invoking a site-specific upstream fetcher. */
 export function matchSiteContentUrl(input: string): MatchedSite | null {
   const url = assertHttpUrlWithoutCredentials(input);
   if (url.protocol !== "https:" || url.port) return null;
+  if ((url.hostname === "codefather.cn" || url.hostname === "www.codefather.cn") && /^\/post\/\d+\/?$/.test(url.pathname)) {
+    return { tool: "fetchCodefatherArticle", source: "codefather", fetchUrl: input };
+  }
   if (url.hostname === "blog.csdn.net" && /^\/[^/]+\/article\/details\/\d+\/?$/.test(url.pathname)) return { tool: "fetchCsdnArticle", source: "csdn", fetchUrl: input };
   if (url.hostname === "juejin.cn" && /^\/post\/\d+\/?$/.test(url.pathname)) return { tool: "fetchJuejinArticle", source: "juejin", fetchUrl: input };
   if (url.hostname === "linux.do") {
@@ -226,6 +230,10 @@ export class SearchService {
   }
 
   private async fetchSpecialized(tool: SiteFetchToolName, url: string): Promise<string | null> {
+    if (tool === "fetchCodefatherArticle") {
+      const article = await new CodefatherContentService().fetchArticle(url);
+      return article.markdown;
+    }
     if (tool === "fetchGithubReadme") return this.upstream.fetchGithubReadme({ url });
     if (tool === "fetchCsdnArticle") return this.upstream.fetchCsdnArticle({ url });
     if (tool === "fetchJuejinArticle") return this.upstream.fetchJuejinArticle({ url });

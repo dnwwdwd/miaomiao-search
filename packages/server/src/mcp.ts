@@ -11,9 +11,10 @@ import { WechatContentService, type WechatSource } from "./services/wechat-conte
 export const mcpTools = [
   { id: "search", name: "search", description: "多引擎分组与聚合搜索", parameters: "query, limit?, engines, searchMode", scope: "search" as const },
   { id: "searchWechatArticles", name: "searchWechatArticles", description: "搜索微信公众号文章：搜狗微信搜索或今天看啥镜像发现文章并还原直链", parameters: "query, limit?, source", scope: "search" as const },
-  { id: "fetchWebContent", name: "fetchWebContent", description: "按链接自动抓取：小红书帖子、飞书文档和微信公众号文章使用平台抓取器，其他网页使用通用正文读取器", parameters: "url, maxChars", scope: "fetch" as const },
-  { id: "fetchPlatformContent", name: "fetchPlatformContent", description: "输入小红书帖子、飞书文档或微信公众号文章链接，自动识别平台并返回 Markdown 正文、作者和媒体链接", parameters: "url, maxChars", scope: "fetch" as const },
+  { id: "fetchWebContent", name: "fetchWebContent", description: "按链接自动抓取：小红书帖子、飞书文档、微信公众号文章和编程导航文章使用专用抓取器，其他网页使用通用正文读取器", parameters: "url, maxChars", scope: "fetch" as const },
+  { id: "fetchPlatformContent", name: "fetchPlatformContent", description: "输入小红书帖子、飞书文档、微信公众号或编程导航文章链接，自动识别平台并返回 Markdown 正文、作者和媒体链接", parameters: "url, maxChars", scope: "fetch" as const },
   { id: "fetchWechatArticle", name: "fetchWechatArticle", description: "读取微信公众号文章正文", parameters: "url, maxChars", scope: "fetch" as const, siteSpecific: true, host: "mp.weixin.qq.com" },
+  { id: "fetchCodefatherArticle", name: "fetchCodefatherArticle", description: "读取编程导航 (codefather.cn) 文章完整 Markdown 正文", parameters: "url", scope: "fetch" as const, siteSpecific: true, host: "codefather.cn" },
   { id: "fetchCsdnArticle", name: "fetchCsdnArticle", description: "读取 CSDN 文章正文", parameters: "url", scope: "fetch" as const, siteSpecific: true, host: "csdn.net" },
   { id: "fetchJuejinArticle", name: "fetchJuejinArticle", description: "读取掘金文章正文", parameters: "url", scope: "fetch" as const, siteSpecific: true, host: "juejin.cn" },
   { id: "fetchGithubReadme", name: "fetchGithubReadme", description: "读取 GitHub README", parameters: "url", scope: "fetch" as const, siteSpecific: true, host: "github.com" },

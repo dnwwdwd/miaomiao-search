@@ -1,4 +1,4 @@
-export const engineIds = ["bing", "baidu", "duckduckgo", "exa", "csdn", "juejin", "sogou", "firecrawl", "tavily", "github", "bilibili", "zhihu_official", "feishu", "wechat"] as const;
+export const engineIds = ["bing", "baidu", "duckduckgo", "exa", "csdn", "juejin", "sogou", "firecrawl", "tavily", "github", "bilibili", "zhihu_official", "feishu", "wechat", "codefather"] as const;
 export type EngineId = (typeof engineIds)[number];
 
 /**
@@ -76,8 +76,8 @@ export type FetchContent = {
   retrievalMethod?: string;
   extractionMethod?: string;
   readabilityApplied?: boolean;
-  platform?: "xiaohongshu" | "feishu" | "wechat";
-  source?: "csdn" | "juejin" | "linuxdo" | "github";
+  platform?: "xiaohongshu" | "feishu" | "wechat" | "codefather";
+  source?: "csdn" | "juejin" | "linuxdo" | "github" | "codefather";
   author?: string;
   publishedAt?: string;
   images?: string[];

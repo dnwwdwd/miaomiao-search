@@ -22,6 +22,7 @@ export const engineCatalog: Record<string, EngineCatalogEntry> = {
   xiaohongshu: { id: "xiaohongshu", name: "Xiaohongshu", iconUrl: "https://www.xiaohongshu.com/favicon.ico", tagClass: "engine-tag-xiaohongshu" },
   linuxdo: { id: "linuxdo", name: "Linux.do", iconUrl: "/engine-icons/linuxdo.png", tagClass: "engine-tag-linuxdo" },
   wechat: { id: "wechat", name: "微信公众号", iconUrl: "https://mp.weixin.qq.com/favicon.ico", tagClass: "engine-tag-wechat" },
+  codefather: { id: "codefather", name: "编程导航", iconUrl: "https://www.codefather.cn/favicon.ico", tagClass: "engine-tag-codefather" },
   webpage: { id: "webpage", name: "Web page", iconUrl: "", tagClass: "engine-tag-unknown" },
 };
 

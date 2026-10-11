@@ -17,13 +17,14 @@ import { Input } from "@/components/ui/input";
 import { EngineTag } from "@/components/ui/engine-tag";
 import type { FeishuConnection } from "@/types/portal";
 
-type PreviewSource = "xiaohongshu" | "feishu" | "wechat" | "csdn" | "juejin" | "linuxdo" | "github" | "webpage";
+type PreviewSource = "xiaohongshu" | "feishu" | "wechat" | "codefather" | "csdn" | "juejin" | "linuxdo" | "github" | "webpage";
 type PreviewContent = { source: PreviewSource; sourceUrl: string; title: string; author?: string; publishedAt?: string; markdown: string; images: string[]; videoUrls: string[]; truncated: boolean };
 
 const platformName: Record<PreviewSource, { zh: string; en: string }> = {
   xiaohongshu: { zh: "小红书", en: "Xiaohongshu" },
   feishu: { zh: "飞书", en: "Feishu" },
   wechat: { zh: "微信公众号", en: "WeChat Official Account" },
+  codefather: { zh: "编程导航", en: "Codefather" },
   csdn: { zh: "CSDN", en: "CSDN" },
   juejin: { zh: "掘金", en: "Juejin" },
   linuxdo: { zh: "Linux.do", en: "Linux.do" },

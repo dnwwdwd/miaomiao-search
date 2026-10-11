@@ -1,7 +1,7 @@
 import type { EngineId } from "./domain.js";
 
 export type CredentialMode = "none" | "optional" | "required";
-export type ProviderKind = "open-websearch" | "exa" | "firecrawl" | "tavily" | "github" | "bilibili" | "zhihu-official" | "feishu" | "wechat";
+export type ProviderKind = "open-websearch" | "exa" | "firecrawl" | "tavily" | "github" | "bilibili" | "zhihu-official" | "feishu" | "wechat" | "codefather";
 export type EngineDefinition = {
   provider: ProviderKind;
   requiresProxy: boolean;
@@ -29,6 +29,7 @@ export const engineCatalog: Record<EngineId, EngineDefinition> = {
   zhihu_official: { provider: "zhihu-official", requiresProxy: false, credentialMode: "required", credentialLabel: "知乎开放平台 Access Secret", credentialPlaceholder: "Access Secret", credentialUrl: "https://developer.zhihu.com/profile", defaultEnabled: false, defaultSelected: false, maxResults: 10 },
   feishu: { provider: "feishu", requiresProxy: false, credentialMode: "none", defaultEnabled: false, defaultSelected: false, maxResults: 20 },
   wechat: { provider: "wechat", requiresProxy: false, credentialMode: "none", defaultEnabled: false, defaultSelected: false, maxResults: 10 },
+  codefather: { provider: "codefather", requiresProxy: false, credentialMode: "none", defaultEnabled: true, defaultSelected: false, maxResults: 20 },
 };
 
 export type CatalogEngineId = keyof typeof engineCatalog;
