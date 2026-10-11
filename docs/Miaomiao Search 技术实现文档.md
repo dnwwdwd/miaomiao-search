@@ -999,6 +999,10 @@ MCP `search` Tool 名称与返回结构保持不变，工具描述和引擎枚�
 
 平台正文路由自 2026-10-11 起不再依赖 `autoMatch` 或渠道（详见 `docs/Decisions/DEC-20260928-001-content-auto-fetch.md`）：URL 命中 `identifyPlatformContentUrl`（小红书、微信公众号、编程导航、飞书）时无条件走平台专用/官方接口，`autoMatch` 仅继续控制 CSDN、掘金、Linux.do、GitHub README 等站点专用抓取器。编程导航等平台的官方接口直接返回 Markdown，避免抓取 HTML 页面丢失代码块、图片和文档结构。
 
+门户搜索页阅读器自 2026-10-11 起与内容抓取页统一：`search-page.tsx` 的 `read()` 不再维护硬编码平台主机白名单，改为 `fetchContent(url, 50_000, true)`，由服务端按 URL 决定平台抓取器与站点专用抓取器。首页点击 CSDN、掘金、Linux.do、GitHub 结果时因此也启用对应专用抓取器；普通链接仍走通用网页抓取。前端不再重复主机判断，避免服务端已支持的来源被前端白名单静默丢弃。
+
+编程导航链接识别覆盖三种形态（2026-10-11 实测确认无移动域名、`/question/` 非真实路由）：`/post/{id}`、`/essay/{id}`、`/qa/{id}`，分别调用 `post/get/vo`、`essay/get/vo`、`qa/get/vo`。`/essay/{id}` 接口无 `title` 字段，标题回退为正文首个非空行（去除 Markdown 标记）或分类名。识别函数 `identifyCodefatherContentUrl` 返回 `{ kind, id }`；`matchSiteContentUrl` 与 `identifyPlatformContentUrl` 同步覆盖，MCP `fetchCodefatherArticle` 沿用同一服务。
+
 ### MCP 平台内容自动分流（2026-09-25）
 
 `mcp.ts` 新增 `fetchPlatformContent(url,maxChars?)`，沿用 Fetch scope；`SearchService.fetchPlatformContent` 复用用户级 `PlatformContentService` 并记录 MCP 审计。`fetchWebContent` 对 `identifyPlatformContentUrl` 识别的小红书、飞书内容 URL 走相同服务，将 Markdown 与平台元数据映射到兼容的 `FetchContent`；普通 URL 仍使用 Open-WebSearch。识别函数限制 HTTPS、无 URL 凭据、固定主机与内容路径，平台服务继续校验跳转、权限、正文和响应大小。平台正文不进入通用内容缓存。

@@ -13,7 +13,7 @@
 
 | ID | 日期 | 分类 | 标题 | 状态 | 决策 / 功能进度 | 备注 |
 |---|---|---|---|---|---|---|
-| REQ-20261010-002 | 2026-10-10 | 功能需求 / 搜索 / 抓取 / MCP / 门户 | 编程导航（codefather）文章搜索与完整正文接入 | 已完成 | `docs/Requirements/REQ-20261010-002-codefather-search-and-content.md` | codefather 搜索源、正文抓取服务、专用 MCP Tool fetchCodefatherArticle 与前端门户适配均已完成并通过验证。 |
+| REQ-20261010-002 | 2026-10-10 | 功能需求 / 搜索 / 抓取 / MCP / 门户 | 编程导航（codefather）文章搜索与完整正文接入 | 已完成 | `docs/Requirements/REQ-20261010-002-codefather-search-and-content.md` | codefather 搜索源、正文抓取服务、专用 MCP Tool fetchCodefatherArticle 与前端门户适配均已完成并通过验证；2026-10-11 扩展 `/post` `/essay` `/qa` 三形态并统一搜索页阅读路由。 |
 | REQ-20261010-001 | 2026-10-10 | 功能需求 / 抓取 / 搜索 / MCP | 微信公众号内容抓取与文章发现 | 待验证 | `docs/Requirements/REQ-20261010-001-wechat-content-fetch.md`、`docs/Decisions/DEC-20261010-001-wechat-content-fetch.md`、`docs/Progress/PROG-REQ-20261010-001-wechat-content-fetch.md` | 微信正文抓取、搜狗/镜像发现、MCP `searchWechatArticles`/`fetchWechatArticle` 与门户 `/api/wechat/discover` 已实现并通过本地自动化；真实网络与设备验证待执行。 |
 | REQ-20260928-001 | 2026-09-28 | 功能调整 / 内容抓取 / UI | 内容抓取自动匹配与状态颜色 | 待验证 | `docs/Requirements/REQ-20260928-001-content-auto-fetch.md`、`docs/Decisions/DEC-20260928-001-content-auto-fetch.md`、`docs/Progress/PROG-REQ-20260928-001-content-auto-fetch.md` | 既有自动化与浏览器验证已完成；本轮标签和通用网页回退修改尚未回归。Linux.do 当前网络 403。 |
 | REQ-20260925-001 | 2026-09-25 | 功能需求 / 搜索 / 抓取 / 门户 / MCP / 懒猫下载 | 小红书与飞书内容抓取及飞书、知乎官方搜索 | 待实机验证 | `docs/Requirements/REQ-20260925-001-platform-content-fetch.md`、`docs/Decisions/DEC-20260925-001-platform-content-fetch.md`、`docs/Progress/PROG-REQ-20260925-001-platform-content-fetch.md` | 门户与 MCP 按链接抓取、自动分流、类型检查、Lint、测试和构建完成；真实账号与设备端验证待执行。 |

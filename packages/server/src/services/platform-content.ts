@@ -5,7 +5,7 @@ import { fetchText } from "../providers/http-json.js";
 import { isFeishuDocumentUrl } from "../providers/feishu-provider.js";
 import { FeishuConnectionService } from "./feishu-connection.js";
 import { WechatContentService, identifyWechatArticleUrl } from "./wechat-content.js";
-import { CodefatherContentService, identifyCodefatherArticleUrl } from "./codefather-content.js";
+import { CodefatherContentService, identifyCodefatherContentUrl } from "./codefather-content.js";
 import type { SettingsService } from "./settings.js";
 
 export type Platform = "xiaohongshu" | "feishu" | "wechat" | "codefather";
@@ -16,7 +16,7 @@ export function identifyPlatformContentUrl(input: string): Platform | null {
   if (url.hostname === "xhslink.com" || url.hostname.endsWith(".xhslink.com")) return /^\/[a-zA-Z0-9_-]+\/?$/.test(url.pathname) ? "xiaohongshu" : null;
   if (url.hostname === "www.xiaohongshu.com" || url.hostname === "xiaohongshu.com") return /^\/(?:explore|discovery\/item|item)\/[a-fA-F0-9]{24}(?:\/|$)/.test(url.pathname) ? "xiaohongshu" : null;
   if (identifyWechatArticleUrl(url.toString())) return "wechat";
-  if (identifyCodefatherArticleUrl(url.toString())) return "codefather";
+  if (identifyCodefatherContentUrl(url.toString())) return "codefather";
   if (isFeishuDocumentUrl(url.toString())) return "feishu";
   return null;
 }
@@ -56,8 +56,8 @@ export class PlatformContentService {
       const article = await this.wechat.fetchArticle(wechatUrl, maxChars);
       return { platform: "wechat", sourceUrl: article.sourceUrl, title: article.title, ...(article.author ? { author: article.author } : {}), ...(article.publishedAt ? { publishedAt: article.publishedAt } : {}), markdown: article.markdown, images: article.images, videoUrls: [], truncated: article.truncated, retrievalMethod: "public-page" };
     }
-    const codefatherPostId = identifyCodefatherArticleUrl(url.toString());
-    if (codefatherPostId) {
+    const codefatherTarget = identifyCodefatherContentUrl(url.toString());
+    if (codefatherTarget) {
       const article = await this.codefather.fetchArticle(url.toString(), maxChars);
       return { platform: "codefather", sourceUrl: article.sourceUrl, title: article.title, ...(article.author ? { author: article.author } : {}), ...(article.publishedAt ? { publishedAt: article.publishedAt } : {}), markdown: article.markdown, images: article.images, videoUrls: [], truncated: article.truncated, retrievalMethod: "official-api" };
     }

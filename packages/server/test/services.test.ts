@@ -496,6 +496,35 @@ test("platform content routing does not depend on autoMatch or channel", async (
   }
 });
 
+test("codefather essay and qa URLs route through the platform reader", async () => {
+  const { dir, config, database } = setup();
+  try {
+    const upstream = new FakeUpstream();
+    const requested: string[] = [];
+    const platformFetch = { fetch: async (url: string) => {
+      requested.push(url);
+      return { platform: "codefather" as const, sourceUrl: url, title: "编程导航内容", markdown: "# 正文", images: [], videoUrls: [], truncated: false, retrievalMethod: "official-api" as const };
+    } };
+    const service = new SearchService(upstream, new AuditService(database), new SettingsService(database, config.settingsEncryptionKey), undefined, undefined, undefined, undefined, undefined, platformFetch);
+
+    const essay = await service.fetchContent("https://www.codefather.cn/essay/2104434026335993858", 50_000, { channel: "web" });
+    assert.equal(essay.content.platform, "codefather");
+    assert.equal(essay.content.finalUrl, "https://www.codefather.cn/essay/2104434026335993858");
+
+    const qa = await service.fetchContent("https://www.codefather.cn/qa/2108205366507503617", 50_000, { channel: "web" });
+    assert.equal(qa.content.platform, "codefather");
+
+    assert.equal(upstream.fetchCalls.length, 0);
+    assert.deepEqual(requested, [
+      "https://www.codefather.cn/essay/2104434026335993858",
+      "https://www.codefather.cn/qa/2108205366507503617",
+    ]);
+  } finally {
+    database.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("upstream adapter rejects insecure runtime settings and unsafe result URLs", async () => {
   const originalFetch = globalThis.fetch;
   try {

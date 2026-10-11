@@ -227,15 +227,13 @@ export function SearchPage() {
     }
     setReader({ url, title: title || url, content: "", finalUrl: url, contentType: "text/plain", truncated: false, loading: true, sourceEngine });
     try {
-      const host = new URL(url).hostname;
-      const platformSource = ["xiaohongshu.com", "www.xiaohongshu.com", "xhslink.com", "mp.weixin.qq.com"].includes(host) || host === "feishu.cn" || host.endsWith(".feishu.cn") || host === "larksuite.com" || host.endsWith(".larksuite.com");
-      if (platformSource) {
-        const data = await api.fetchPlatformContent(url);
-        setReader({ url, title: data.content.title || title, content: data.content.markdown, finalUrl: data.content.sourceUrl, contentType: "text/markdown", truncated: data.content.truncated, loading: false, sourceEngine, retrievalMethod: data.content.retrievalMethod });
-      } else {
-        const data = await api.fetchContent(url);
-        setReader({ url, title: data.content.title || title, content: data.content.content, finalUrl: data.content.finalUrl, contentType: data.content.contentType, truncated: data.content.truncated, loading: false, sourceEngine, retrievalMethod: data.content.retrievalMethod, extractionMethod: data.content.extractionMethod, readabilityApplied: data.content.readabilityApplied });
-      }
+      // Let the server decide the reader from the URL: platform readers
+      // (Xiaohongshu, WeChat, Feishu, Codefather) always win, and autoMatch
+      // enables the site-specific readers (CSDN, Juejin, Linux.do, GitHub).
+      // Keeping the host list here would silently drop sources the server
+      // already supports.
+      const data = await api.fetchContent(url, 50_000, true);
+      setReader({ url, title: data.content.title || title, content: data.content.content, finalUrl: data.content.finalUrl, contentType: data.content.contentType, truncated: data.content.truncated, loading: false, sourceEngine, retrievalMethod: data.content.retrievalMethod, extractionMethod: data.content.extractionMethod, readabilityApplied: data.content.readabilityApplied });
     } catch (error) {
       const notExtracted = contentNotExtracted(error);
       const rawMessage = error instanceof Error ? error.message : (english ? "Could not read page content." : "正文读取失败");

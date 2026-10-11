@@ -5,7 +5,7 @@ import { AuditService } from "./audit.js";
 import { TtlLruCache } from "./cache.js";
 import { SettingsService } from "./settings.js";
 import { identifyPlatformContentUrl, PlatformContentService, type PlatformContent } from "./platform-content.js";
-import { CodefatherContentService } from "./codefather-content.js";
+import { CodefatherContentService, identifyCodefatherContentUrl } from "./codefather-content.js";
 
 const searchCacheTtlMs = 60 * 60 * 1_000;
 const contentCacheTtlMs = 24 * 60 * 60 * 1_000;
@@ -19,7 +19,7 @@ type MatchedSite = { tool: SiteFetchToolName; source: NonNullable<FetchContent["
 export function matchSiteContentUrl(input: string): MatchedSite | null {
   const url = assertHttpUrlWithoutCredentials(input);
   if (url.protocol !== "https:" || url.port) return null;
-  if ((url.hostname === "codefather.cn" || url.hostname === "www.codefather.cn") && /^\/post\/\d+\/?$/.test(url.pathname)) {
+  if ((url.hostname === "codefather.cn" || url.hostname === "www.codefather.cn") && identifyCodefatherContentUrl(input)) {
     return { tool: "fetchCodefatherArticle", source: "codefather", fetchUrl: input };
   }
   if (url.hostname === "blog.csdn.net" && /^\/[^/]+\/article\/details\/\d+\/?$/.test(url.pathname)) return { tool: "fetchCsdnArticle", source: "csdn", fetchUrl: input };

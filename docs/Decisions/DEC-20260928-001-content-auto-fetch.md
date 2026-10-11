@@ -12,6 +12,24 @@
 - `autoMatch` 参数保留，继续控制站点专用抓取器（CSDN、掘金、Linux.do、GitHub README）的启用；不传时这些站点仍走通用网页抓取。
 - 未命中平台识别的普通链接继续走通用网页抓取，行为不变。
 
+## 更新（2026-10-11，门户搜索页阅读路由统一）
+
+经用户确认，撤销「搜索页阅读器不启用门户自动匹配」的既有约束，搜索页与内容抓取页统一走同一套服务端路由：
+
+- `search-page.tsx` 的 `read()` 不再维护硬编码平台主机白名单，改为调用 `api.fetchContent(url, 50_000, true)`，由服务端按 URL 决定平台抓取器与站点专用抓取器；普通链接仍走通用网页抓取。
+- 因此首页点击 CSDN、掘金、Linux.do、GitHub 搜索结果时也启用对应站点专用抓取器（此前这些来源在搜索页走通用网页抓取）。小红书、微信、飞书、编程导航的行为不变。
+- 前端不再重复实现主机判断，避免服务端已支持的来源被前端白名单静默丢弃。
+
+## 编程导航链接形态（2026-10-11 实测修正）
+
+实测确认编程导航**没有移动域名**（`m.codefather.cn` 无 DNS 记录），`/question/` 也非真实路由。真实内容形态为三种，均各有公开接口，现已全部识别：
+
+- `/post/{id}` → `post/get/vo`（原有）。
+- `/essay/{id}` → `essay/get/vo`；该接口无 `title` 字段，标题回退为正文首个非空行（去除 Markdown 标记）或分类名。
+- `/qa/{id}` → `qa/get/vo`；返回 `title` 与 `content`。
+
+`identifyCodefatherArticleUrl` 重命名为 `identifyCodefatherContentUrl`，返回 `{ kind, id }`；`matchSiteContentUrl` 与 `identifyPlatformContentUrl` 同步覆盖三种形态。仅数字 ID 输入仍按 `post` 处理，保持既有 MCP 调用兼容。
+
 ## 方案
 
 在现有 `/api/fetch-content` 请求体增加可选 `autoMatch`，默认关闭，只由内容抓取页传入。服务端识别受支持的平台和专用站点，调用既有抓取器；没有命中专用来源与路径的 URL 走通用网页抓取。响应增加可选站点来源字段，用于预览标签。平台抓取继续返回媒体元数据。

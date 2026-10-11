@@ -3,7 +3,7 @@
 | REQ ID | 标题 | 状态 | 当前阶段 | 功能进度文档 | 最近更新 | 阻塞 / 下一步 |
 |---|---|---|---|---|---|---|
 | REQ-20261010-001 | 微信公众号抓取与文章发现 | 待验证 | 服务、搜索源、MCP Tool、门户接口与测试已完成；0.1.4 LPK 已重新打包 | `docs/Progress/PROG-REQ-20261010-001-wechat-content-fetch.md` | 2026-10-10 | Docker Hub digest `sha256:49e5f9cc3b2a602647920251802677c5919093636dfc63d8a83e185776abec90`；官方镜像 `registry.lazycat.cloud/u30387910/c1own123/lazycat:c37f8d6655fee51e`；LPK `release/miaomiao-search-0.1.4.lpk` SHA-256 `a99be1549f04739f4346141be19b18ede95aa8155e8e1a9530825bd7dbb241e8`；真实页面行为与设备安装回归待执行。 |
-| REQ-20260928-001 | 内容抓取自动匹配与状态颜色 | 待验证 | 来源标签与通用网页回退已补充，待回归 | `docs/Progress/PROG-REQ-20260928-001-content-auto-fetch.md` | 2026-09-28 | 本轮修改尚未回归；Linux.do 当前出口 403，待可访问网络和设备复测。 |
+| REQ-20260928-001 | 内容抓取自动匹配与状态颜色 | 待验证 | 来源标签、通用网页回退、搜索页统一路由与编程导航三形态已补充 | `docs/Progress/PROG-REQ-20260928-001-content-auto-fetch.md` | 2026-10-11 | 搜索页阅读器改走服务端统一路由、编程导航 `/post` `/essay` `/qa` 三形态已实现，typecheck/lint/build 与服务端 92 项测试通过；Linux.do 当前出口 403，待可访问网络和设备复测。 |
 | REQ-20260925-001 | 小红书与飞书抓取及搜索 | 待实机验证 | 门户、MCP 自动抓取与本地验证完成 | `docs/Progress/PROG-REQ-20260925-001-platform-content-fetch.md` | 2026-09-25 | 真实飞书账号、官方 CLI Access Secret、MCP 客户端和懒猫设备下载待验证。 |
 | REQ-20260913-001 | 知乎站内搜索与正文读取实验 | 已由官方 CLI 搜索替代 | Provider、目录、门户和 MCP 接入已完成；在线 POC 受 Bing/知乎反爬和浏览器系统依赖限制 | `docs/Progress/PROG-REQ-20260913-001-zhihu-search-source.md` | 2026-09-13 | 在完整 Chromium 运行时和懒猫设备验证站内结果、正文提取、错误组件与 MCP 动态枚举。 |
 | REQ-20260831-003 | Exa MCP 使用用户数据库凭据 | 待验证 | Fastify Exa Provider、加密设置读取和 MCP 测试已完成 | `docs/Progress/PROG-REQ-20260831-003-exa-database-credential.md` | 2026-08-31 | 完成最终 lint/typecheck/test/build 与 LPK 发布；待设备双用户凭据隔离回归。 |
