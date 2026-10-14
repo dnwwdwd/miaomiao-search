@@ -1,12 +1,12 @@
 # Miaomiao Search PRD
 
-> 项目名：miaomiao-search 基础项目：Open-WebSearch 文档版本：v0.6；实现同步：2026-09-13
+> 项目名：miaomiao-search 基础项目：Open-WebSearch 文档版本：v0.7；实现同步：2026-10-11
 
 ## 1. 项目背景
 
 Open-WebSearch 已具备多搜索引擎联网搜索、网页正文抓取、MCP Server、CLI、本地 HTTP daemon 等能力，默认不依赖第三方 Search API Key。
 
-当前目录支持 13 个搜索源：Bing、Baidu、DuckDuckGo、Exa、CSDN、掘金、搜狗、Firecrawl、Tavily、GitHub、B站、知乎官方 CLI 和飞书。知乎官方 CLI 使用 Access Secret 搜索；飞书使用当前用户 OAuth 搜索可访问文档。MCP 继续暴露统一的 `search`、`fetchWebContent`、`fetchPlatformContent`、`fetchCsdnArticle`、`fetchJuejinArticle`、`fetchGithubReadme`、`fetchLinuxDoArticle` Tool。
+当前目录支持 15 个搜索源：Bing、Baidu、DuckDuckGo、Exa、CSDN、掘金、搜狗、Firecrawl、Tavily、GitHub、B站、知乎官方 CLI、飞书、微信公众号和编程导航。知乎官方 CLI 使用 Access Secret 搜索；飞书使用当前用户 OAuth 搜索可访问文档；微信公众号通过搜狗微信搜索或镜像站发现文章并还原直链；编程导航通过官方免登录接口搜索。MCP 继续暴露统一的 `search`、`searchWechatArticles`、`fetchWebContent`、`fetchPlatformContent`、`fetchWechatArticle`、`fetchCodefatherArticle`、`fetchCsdnArticle`、`fetchJuejinArticle`、`fetchGithubReadme`、`fetchLinuxDoArticle` Tool。
 
 miaomiao-search 在 Open-WebSearch 基础上增加 Web 产品层和远程 MCP 服务层，形成一个既能由人直接使用，也能供外部 Agent 调用的自托管联网搜索服务。
 
@@ -46,7 +46,7 @@ V1 共 6 个页面：Login + 5 个功能页面。登录账户按现有角色访�
 | 组件 | 说明 |
 | --- | --- |
 | 搜索输入框 | 文本输入；Enter 提交；空输入禁止提交；搜索中禁止重复提交；输入为完整 URL 时提示"读取正文" |
-| 引擎选择器 | 多选；可选 13 个目录引擎；已禁用引擎不可选；记住浏览器最近选择；支持"一键恢复默认"。DuckDuckGo 启用时提示确认 TUN/VPN 代理；Firecrawl/Tavily 启用前需要 Key，GitHub Token 可选，B站无需密钥，知乎官方 CLI 需要 Access Secret，飞书需要 OAuth 授权。知乎官方 CLI 和飞书默认关闭。Linux.do 上游标记暂不可用，默认不展示 |
+| 引擎选择器 | 多选；可选 15 个目录引擎；已禁用引擎不可选；记住浏览器最近选择；支持"一键恢复默认"。DuckDuckGo 启用时提示确认 TUN/VPN 代理；Firecrawl/Tavily 启用前需要 Key，GitHub Token 可选，B站无需密钥，知乎官方 CLI 需要 Access Secret，飞书需要 OAuth 授权，微信公众号和编程导航无需密钥。DuckDuckGo、Exa、Firecrawl、Tavily、GitHub、B站、知乎官方 CLI、飞书和微信公众号默认关闭，编程导航默认启用但不默认勾选。Linux.do 上游标记暂不可用，默认不展示 |
 | 搜索数量选择 | 首页默认使用引擎默认值；5 / 10 / 20 / 30 / 50 按当前选中引擎的最小 `maxResults` 过滤，仅作为本次请求临时上限且不写回配置。每个引擎受自身 `result_limit` 和 Provider 上限约束，未配置时使用搜索默认值 10 |
 | 高级选项折叠区 | Bing Search Mode（Auto / Request），仅选中 Bing 时显示，默认使用系统配置 |
 | 搜索结果列表 | 默认展示按引擎分组的结果和每组状态；可切换聚合视图。聚合视图按 canonical URL 去重并合并来源显示（如 `Bing · DuckDuckGo`）；结果可选显示约 16:9 封面，图片 lazy loading、no-referrer，失败时回退 favicon/图标；普通结果支持读取正文，B站视频点击后打开视频详情（封面、作者、播放、点赞、收藏、评论、时长和发布时间），知乎官方 CLI 结果点击后展示标题、搜索摘要、作者、内容类型、赞同、评论和更新时间，并提供阅读全文的源站入口 |
@@ -64,7 +64,7 @@ MCP 服务管理和外部 Agent 接入。
 | 组件 | 说明 |
 | --- | --- |
 | 服务状态 | Endpoint URL、Transport 类型（Streamable HTTP / Legacy SSE）、运行状态 |
-| Tool 列表 | `search`、`fetchWebContent`、`fetchPlatformContent`、`fetchCsdnArticle`、`fetchJuejinArticle`、`fetchGithubReadme`、`fetchLinuxDoArticle`；每个 Tool 显示关键参数；管理员可单独启停站点专用 fetch Tool |
+| Tool 列表 | `search`、`searchWechatArticles`、`fetchWebContent`、`fetchPlatformContent`、`fetchWechatArticle`、`fetchCodefatherArticle`、`fetchCsdnArticle`、`fetchJuejinArticle`、`fetchGithubReadme`、`fetchLinuxDoArticle`；每个 Tool 显示关键参数；管理员可单独启停站点专用 fetch Tool |
 | Access Token 列表 | 每行：名称、Prefix、Scope、创建时间、过期时间、最近使用时间、今日调用量、状态；操作：创建、禁用、启用、撤销、删除 |
 | Token 创建表单 | 字段：名称、过期时间、Scope（search / fetch）、每分钟请求上限、每日请求上限；创建后 Secret 只展示一次，数据库只保存 Hash |
 | 客户端配置模板 | WorkBuddy、Cherry Studio、Claude Code、Codex、Generic；每个含 Server Name、Endpoint、Transport、Authorization Header 示例；配置按原始 JSON 换行展示，长行自动折行并支持“复制配置” |
@@ -78,7 +78,7 @@ MCP 服务管理和外部 Agent 接入。
 | --- | --- |
 | 引擎列表 | 每行：名称、Enabled 开关、是否默认、Search Mode、每次返回数量、凭据模式、最近测试时间、状态徽标、延迟、最近错误；支持分别调整首页和 MCP 默认搜索顺序并持久化 |
 | 状态枚举 | Healthy / Degraded / Rate Limited / Blocked / Unavailable / Disabled / Unknown |
-| 凭据模式 | Exa/Firecrawl/Tavily 必需 API Key；GitHub Token 可选且仅搜索公共仓库；B站无需密钥；知乎官方 CLI 需要 Access Secret；飞书使用用户 OAuth；凭据按用户加密保存并立即生效 |
+| 凭据模式 | Exa/Firecrawl/Tavily 必需 API Key；GitHub Token 可选且仅搜索公共仓库；B站、微信公众号和编程导航无需密钥；知乎官方 CLI 需要 Access Secret；飞书使用用户 OAuth；凭据按用户加密保存并立即生效 |
 | 测试搜索 | 固定或自定义关键词；测试绕过搜索缓存，不进入搜索历史，成功或失败都记录最近测试时间、延迟、错误和健康状态 |
 
 ### 3.5 Usage
@@ -128,8 +128,11 @@ V1 保持 Open-WebSearch Tool 语义：
 | Tool | 关键参数 |
 | --- | --- |
 | `search` | query, limit（可选）, engines, searchMode |
+| `searchWechatArticles` | query, limit（可选）, source；搜狗微信搜索或今天看啥镜像发现文章并还原直链 |
 | `fetchWebContent` | url, maxChars；支持的平台内容链接自动走对应抓取器 |
-| `fetchPlatformContent` | url, maxChars；按小红书、飞书链接自动识别来源 |
+| `fetchPlatformContent` | url, maxChars；按小红书、飞书、微信公众号、编程导航链接自动识别来源 |
+| `fetchWechatArticle` | url, maxChars；微信公众号文章正文 |
+| `fetchCodefatherArticle` | url；编程导航完整 Markdown 正文 |
 | `fetchCsdnArticle` | url |
 | `fetchJuejinArticle` | url |
 | `fetchGithubReadme` | url |
@@ -177,6 +180,6 @@ Token 列表显示：名称、Prefix、Scope、创建时间、过期时间、最
 
 Query 是否写入长期日志由管理员配置。
 
-### 内容抓取页（2026-09-25）
+### 内容抓取页（2026-09-25，2026-10-11 补充）
 
-独立页面支持粘贴小红书帖子链接或分享文案、飞书 wiki/docx/docs 文档、CSDN 和掘金文章、Linux.do 主题、GitHub 仓库以及普通网页链接。输入框下方显示来源标签；提交后自动匹配抓取器并显示标题、来源、作者、正文和可用图片/视频链接。GitHub 仓库链接读取默认分支 README，普通网页使用通用正文抓取。用户可将当前预览下载为 Markdown；懒猫环境由文件拦截脚本接管 Blob 下载。飞书公开分享链接可直接抓取；完成设备 OAuth 后，可搜索与读取当前账号可访问的文档。
+独立页面支持粘贴小红书帖子链接或分享文案、飞书 wiki/docx/docs 文档、微信公众号文章链接、编程导航文章链接、CSDN 和掘金文章、Linux.do 主题、GitHub 仓库以及普通网页链接。输入框下方显示来源标签（如"小红书""飞书""微信公众号""编程导航"）；提交后自动匹配抓取器并显示标题、来源、作者、正文和可用图片/视频链接。GitHub 仓库链接读取默认分支 README，普通网页使用通用正文抓取。平台内容路由（小红书、飞书、微信公众号、编程导航）只依据 URL 识别结果，不依赖调用方的 `autoMatch` 开关；CSDN、掘金、Linux.do、GitHub 等站点专用抓取器仍由 `autoMatch` 控制。用户可将当前预览下载为 Markdown；懒猫环境由文件拦截脚本接管 Blob 下载。飞书公开分享链接可直接抓取；完成设备 OAuth 后，可搜索与读取当前账号可访问的文档。微信公众号文章基于 Playwright/Chromium 运行时解析，无需微信凭证；编程导航通过官方免登录接口直接读取 Markdown 正文，支持 `/post/{id}`、`/essay/{id}`、`/qa/{id}` 三种形态。

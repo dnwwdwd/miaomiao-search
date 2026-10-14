@@ -20,7 +20,7 @@
 | 门户交互原型 | 已保留为历史参照 | `miaomiao_search_portal.html` 覆盖原始页面和交互说明。 | 与 JSX 门户保持需求一致。 |
 | 工程基础 | 已完成前端范围 | 根目录已有 Next.js、pnpm、TypeScript、Tailwind CSS、ESLint、生产构建和 lockfile。 | 真实服务端接入前确认项目目录和运行方式。 |
 | 服务端与数据库 | 知乎官方 CLI Provider 本地实现完成 | `packages/server` 已有 SQLite 迁移、OIDC/本地账号应用会话、管理 API、MCP Token、Streamable HTTP、设置加密、审计、历史结果快照、永久保存、按引擎搜索分组、Provider Registry、固定 REST/Octokit/B站适配、知乎官方 CLI 搜索和 Open-WebSearch HTTP 适配器；入口 Host/Origin 与正文 DNS/SSRF 过滤按部署决策移除。 | 完成部署配置与真实网络回归。 |
-| Web 前端 | 知乎官方 CLI 来源展示接入完成 | `app/` 与 `src/components/portal/` 的登录和五个管理页面已使用 Next rewrite 调用真实 API；首页支持 13 个目录引擎、按 Provider 上限过滤数量、B站封面 lazy/no-referrer/fallback、知乎搜索结果源站打开、凭据模式和中英文错误提示。 | 做浏览器端真实 API、飞书正文和部署后的同源路径回归。 |
+| Web 前端 | 知乎官方 CLI 来源展示接入完成 | `app/` 与 `src/components/portal/` 的登录和五个管理页面已使用 Next rewrite 调用真实 API；首页支持 15 个目录引擎、按 Provider 上限过滤数量、B站封面 lazy/no-referrer/fallback、知乎搜索结果源站打开、凭据模式和中英文错误提示。 | 做浏览器端真实 API、飞书正文和部署后的同源路径回归。 |
 | 测试与安全验证 | 默认本地验证通过 | 服务端 Provider 与 MCP 凭据注入测试、门户契约、HTTP 响应上限、B站 412 重试与封面校验、GitHub Token 重建、缓存和健康状态均有覆盖；全量命令结果在本轮交付记录。 | 做 Docker、Tunnel 回源、真实抓取和 MCP 客户端回归。 |
 | Docker 与懒猫微服 | 自定义 amd64 镜像与轻量 LPK 已发布，含 Chromium/Playwright 运行时，设备回归待执行 | `Dockerfile` 生成 web/API/daemon 运行镜像并安装 Chromium；API 生产依赖包含 `playwright-core`；LPK 内容目录只保留说明文件；清单放行认证入口、注入浏览器路径并挂载 SQLite 数据。 | 在懒猫设备完成 OIDC、本地账号、改密、退出登录、MCP 和动态正文回归。 |
 

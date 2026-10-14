@@ -1019,3 +1019,13 @@ MCP `search` Tool 名称与返回结构保持不变，工具描述和引擎枚�
 ### 微信公众号统一搜索源（2026-10-10 追加）
 
 `wechat` 作为第 14 个引擎进入统一搜索体系：`WechatProvider` 复用 `WechatContentService.searchArticles` 的搜狗链路，`maxResults` 10，结果只保留已还原直链的条目，`description` 携带公众号与发布日期；还原中途触发验证码时已解析结果作为 partial 返回（`failures` 携带 `SOGOU_CAPTCHA`），全部被拦截时整体抛错。引擎默认停用（`defaultEnabled: false`），无凭据要求；启用后首页搜索、MCP `search` 引擎枚举和引擎管理页按现有体系自动纳入。每次请求会启动浏览器会话并逐条 3 秒节流还原直链，整体耗时明显高于 HTTP 搜索源，可用 `WECHAT_SEARCH_INTERVAL_MS` 调整节流。
+
+## 14. 编程导航搜索与正文读取（2026-10-10，2026-10-11 修正）
+
+`codefather` 作为第 15 个引擎进入统一搜索体系，`CodefatherProvider`（`packages/server/src/providers/`）调用公开搜索接口 `POST https://api.codefather.cn/api/post/search/page/vo`，`maxResults` 20，无需任何 Cookie 或 Session；结果标题去除 HTML 高亮，封面与 URL 规范化。引擎默认启用（`defaultEnabled: true`）但不默认勾选（`defaultSelected: false`）。
+
+正文读取由 `packages/server/src/services/codefather-content.ts` 提供，调用公开详情接口 `GET https://api.codefather.cn/api/{kind}/get/vo?id={id}`（`kind` 为 `post`/`essay`/`qa`），上游直接返回 Markdown，无需 HTML→Markdown 有损转换。受限内容按上游错误码映射为 `CODEFATHER_LOGIN_REQUIRED`（40100）与 `CODEFATHER_VIP_REQUIRED`（40102）。
+
+链接识别覆盖三种形态（2026-10-11 实测确认无移动域名、`/question/` 非真实路由）：`/post/{id}`、`/essay/{id}`、`/qa/{id}`。`/essay/{id}` 接口无 `title` 字段，标题回退为正文首个非空行（去除 Markdown 标记）或分类名；`/qa/{id}` 返回 `title` 与 `content`。识别函数 `identifyCodefatherContentUrl` 返回 `{ kind, id }`；`matchSiteContentUrl` 与 `identifyPlatformContentUrl` 同步覆盖。
+
+集成点：MCP 新增 `fetchCodefatherArticle`（Fetch scope，host 限 `codefather.cn`）；`fetchWebContent`/`fetchPlatformContent` 对编程导航链接自动分流；门户内容抓取页与搜索页阅读器统一按 URL 路由（不依赖 `autoMatch`）。

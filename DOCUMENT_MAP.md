@@ -27,6 +27,7 @@
 
 ## 当前事实边界
 
+- 2026-10-10 编程导航（codefather）搜索源与正文读取记录在 `docs/Requirements/REQ-20261010-002-codefather-search-and-content.md`；搜索源、正文抓取服务、MCP `fetchCodefatherArticle` 与门户适配均已完成并通过本地验证，2026-10-11 扩展 `/post` `/essay` `/qa` 三形态并统一搜索页阅读路由。
 - 2026-10-10 微信公众号内容抓取与文章发现记录在 `docs/Requirements/REQ-20261010-001-wechat-content-fetch.md`、`docs/Decisions/DEC-20261010-001-wechat-content-fetch.md`、`docs/Progress/PROG-REQ-20261010-001-wechat-content-fetch.md`；本地实现与自动化测试已完成，真实网络与设备验证待执行。
 - 2026-09-28 内容抓取页自动匹配及状态文字颜色记录在 `docs/Requirements/REQ-20260928-001-content-auto-fetch.md`、`docs/Decisions/DEC-20260928-001-content-auto-fetch.md`、`docs/Progress/PROG-REQ-20260928-001-content-auto-fetch.md`。
 - 2026-09-25 小红书与飞书内容抓取及飞书、知乎官方搜索的调研、决策和进度分别记录在 `docs/Decisions/DEC-20260925-001-platform-content-fetch.md`、`docs/Requirements/REQ-20260925-001-platform-content-fetch.md`、`docs/Progress/PROG-REQ-20260925-001-platform-content-fetch.md`；本地实现已完成，真实账号和懒猫设备验证待执行。
